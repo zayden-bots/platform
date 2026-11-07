@@ -26,6 +26,8 @@ levels = { workspace = true }
 lfg = { workspace = true }
 llamad2 = { workspace = true }
 marathon = { workspace = true }
+misc = { workspace = true }
+moderation = { workspace = true }
 music = { workspace = true }
 palworld = { workspace = true }
 patreon = { workspace = true }
@@ -47,7 +49,6 @@ dotenvy = { workspace = true }
 futures = { workspace = true, features = ["async-await"] }
 jiff = { workspace = true }
 jiff-cron = { workspace = true }
-rand = { workspace = true, features = ["thread_rng"] }
 rustls = { workspace = true, features = ["aws-lc-rs"] }
 secrecy = { workspace = true }
 serenity = { workspace = true, features = [

@@ -18,7 +18,9 @@ use zayden_app::config::BotConfig;
 
 use crate::{BotError, Result};
 
-pub async fn build_resolver(config: &BotConfig) -> Result<Arc<dyn TrackResolver>> {
+pub(crate) async fn build_resolver(
+    config: &BotConfig,
+) -> Result<Arc<dyn TrackResolver>> {
     let youtube = YouTubeResolver::new().map_err(BotError::from)?;
     let youtube = match open_cookie_jar(config) {
         Some(jar) => youtube.with_cookies(jar),

@@ -17,6 +17,11 @@ pub struct InvocationCtx<'a> {
     pub app: Arc<AppState>,
 }
 
+pub struct EventCtx<'a> {
+    pub ctx: &'a Context,
+    pub app: Arc<AppState>,
+}
+
 pub struct ComponentCtx<'a> {
     pub ctx: &'a Context,
     pub interaction: &'a ComponentInteraction,

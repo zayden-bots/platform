@@ -68,10 +68,21 @@ pub mod timezone;
 pub use timezone::{UserTimezone, locale_to_timezone};
 
 pub mod ctx;
-pub use ctx::{AutocompleteCtx, ComponentCtx, InvocationCtx, ModalCtx};
+pub use ctx::{AutocompleteCtx, ComponentCtx, EventCtx, InvocationCtx, ModalCtx};
 
 pub mod module;
-pub use module::{ModuleAutocomplete, ModuleCommand, ModuleComponent, ModuleModal};
+pub use module::{
+    EventKind,
+    Module,
+    ModuleAutocomplete,
+    ModuleCommand,
+    ModuleComponent,
+    ModuleModal,
+    Screen,
+};
+
+pub mod registry;
+pub use registry::{RegistryBuilder, RegistryParts};
 use tracing::warn;
 
 pub trait FromOption<'a>: Sized {

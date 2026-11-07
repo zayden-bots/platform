@@ -6,8 +6,6 @@ use tracing::{info, warn};
 use zayden_app::guilds::{GuildPresence, Shard};
 use zayden_core::as_i64;
 
-use crate::bindings::ai::Ai;
-use crate::bindings::destiny2;
 use crate::cron::start_cron_jobs;
 use crate::handler::Handler;
 use crate::patreon_webhook::spawn_patreon_listener;
@@ -22,8 +20,6 @@ impl Handler {
             ready.shard.map_or(NonZeroU16::MIN, |info| info.total),
             ready.guilds.len()
         );
-
-        Ai::identify(&ready.user);
 
         ctx.set_presence(None, OnlineStatus::Online);
 

@@ -17,6 +17,8 @@ pub mod guild_retention;
 mod handler;
 mod legacy_bot_tokens;
 pub mod module_sync;
+mod modules;
+mod music_resolver;
 pub mod patreon_webhook;
 pub mod registry;
 pub mod sqlx_lib;
@@ -34,9 +36,10 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry, filter, fmt};
 use zayden_app::config::BotConfig;
 use zayden_app::events::listener::EventListener;
+use zayden_app::migrations;
 use zayden_app::state::AppState;
-use zayden_app::{migrations, modules};
 
+use crate::modules::ModuleSet;
 use crate::sqlx_lib::new_pool_with_retry;
 use crate::webhook_logger::WebhookLogger;
 
@@ -74,16 +77,21 @@ async fn main() -> Result<()> {
     EventListener::spawn(pool.clone(), app_state.events.clone());
     legacy_bot_tokens::spawn(pool.clone(), bot_config.bot_owner);
 
-    let music_resolver = bindings::music::build_resolver(&bot_config).await?;
+    let music_resolver = music_resolver::build_resolver(&bot_config).await?;
 
     let bot_state_inner =
         BotState::new(Arc::clone(&app_state), &bot_config, music_resolver)?;
+    let modules = Arc::new(ModuleSet::new(bindings::modules(
+        &bot_state_inner,
+        Arc::new(bindings::ZaydenParentToken),
+        bot_config.llamad2_guild,
+    ))?);
     let songbird = Arc::clone(&bot_state_inner.songbird);
     let bot_state = Arc::new(RwLock::new(bot_state_inner));
 
-    let registry = bindings::build_registry(bot_config.llamad2_guild)
+    let registry = bindings::build_registry(&modules)
         .map_err(|e| BotError::Other(e.to_string()))?;
-    modules::validate(&registry.commands_by_module())?;
+    zayden_app::modules::validate(&registry.commands_by_module())?;
 
     let mut client = ClientBuilder::new(
         bot_config
@@ -103,6 +111,7 @@ async fn main() -> Result<()> {
     .data(Arc::clone(&bot_state))
     .event_handler(Arc::new(Handler {
         app: Arc::clone(&app_state),
+        modules,
         bot_state,
         registry,
         cron_started: OnceLock::new(),

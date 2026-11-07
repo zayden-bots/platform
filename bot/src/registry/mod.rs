@@ -8,8 +8,10 @@ use serenity::all::{
     Context,
     CreateCommand,
     CreateInteractionResponse,
+    CreateInteractionResponseFollowup,
     CreateInteractionResponseMessage,
     GuildId,
+    MessageFlags,
     ModalInteraction,
 };
 use tracing::warn;
@@ -26,75 +28,10 @@ use zayden_core::module::{
     ModuleComponent,
     ModuleModal,
 };
+pub use zayden_core::registry::RegistryBuilder;
 use zayden_core::scope::CommandScope;
 
-pub struct RegistryBuilder {
-    commands: HashMap<Cow<'static, str>, Arc<dyn ModuleCommand>>,
-    components: DispatchMap<dyn ModuleComponent>,
-    modals: DispatchMap<dyn ModuleModal>,
-    autocompletes: HashMap<Cow<'static, str>, Arc<dyn ModuleAutocomplete>>,
-}
-
-impl Default for RegistryBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl RegistryBuilder {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            commands: HashMap::new(),
-            components: DispatchMap::new(),
-            modals: DispatchMap::new(),
-            autocompletes: HashMap::new(),
-        }
-    }
-
-    pub fn add_command(&mut self, cmd: impl ModuleCommand + 'static) -> &mut Self {
-        let name = cmd.name();
-        self.commands.insert(name, Arc::new(cmd));
-        self
-    }
-
-    pub fn add_component(
-        &mut self,
-        comp: impl ModuleComponent + 'static,
-    ) -> Result<&mut Self, OverlapError> {
-        let id_match = comp.id_match();
-        self.components.insert(id_match, Arc::new(comp))?;
-        Ok(self)
-    }
-
-    pub fn add_modal(
-        &mut self,
-        modal: impl ModuleModal + 'static,
-    ) -> Result<&mut Self, OverlapError> {
-        let id_match = modal.id_match();
-        self.modals.insert(id_match, Arc::new(modal))?;
-        Ok(self)
-    }
-
-    pub fn add_autocomplete(
-        &mut self,
-        auto: impl ModuleAutocomplete + 'static,
-    ) -> &mut Self {
-        let cmd = auto.command();
-        self.autocompletes.insert(cmd, Arc::new(auto));
-        self
-    }
-
-    #[must_use]
-    pub fn build(self) -> Arc<CommandRegistry> {
-        Arc::new(CommandRegistry {
-            commands: self.commands,
-            components: self.components,
-            modals: self.modals,
-            autocompletes: self.autocompletes,
-        })
-    }
-}
+const MODULE_OFF: &str = "This module is turned off for this server.";
 
 pub struct CommandRegistry {
     commands: HashMap<Cow<'static, str>, Arc<dyn ModuleCommand>>,
@@ -104,6 +41,17 @@ pub struct CommandRegistry {
 }
 
 impl CommandRegistry {
+    #[must_use]
+    pub fn from_builder(builder: RegistryBuilder) -> Arc<Self> {
+        let parts = builder.into_parts();
+        Arc::new(Self {
+            commands: parts.commands,
+            components: parts.components,
+            modals: parts.modals,
+            autocompletes: parts.autocompletes,
+        })
+    }
+
     #[must_use]
     pub fn definitions_for(
         &self,
@@ -151,12 +99,7 @@ impl CommandRegistry {
         if let (Some(module), Some(guild_id)) = (cmd.module(), interaction.guild_id)
             && module_disabled(&app, guild_id, module).await
         {
-            reply_ephemeral(
-                ctx,
-                interaction,
-                "This module is turned off for this server.".to_string(),
-            )
-            .await;
+            reply_ephemeral(ctx, interaction, MODULE_OFF.to_string()).await;
             return Some(Ok(()));
         }
 
@@ -172,16 +115,7 @@ impl CommandRegistry {
                 },
             );
             if !app.entitlements.allows(scope, required).await {
-                let content = app.upgrade_url.as_deref().map_or_else(
-                    || "This command requires a premium subscription.".to_string(),
-                    |url| {
-                        format!(
-                            "This command requires a premium subscription. Upgrade at {url}"
-                        )
-                    },
-                );
-
-                reply_ephemeral(ctx, interaction, content).await;
+                reply_ephemeral(ctx, interaction, upgrade_message(&app)).await;
                 return Some(Ok(()));
             }
         }
@@ -197,6 +131,57 @@ impl CommandRegistry {
         app: Arc<AppState>,
     ) -> Option<Result<(), HandlerError>> {
         let comp = Arc::clone(self.components.lookup(&interaction.data.custom_id)?);
+
+        if let (Some(module), Some(guild_id)) = (comp.module(), interaction.guild_id)
+            && module_disabled(&app, guild_id, module).await
+        {
+            let strip = !comp.keep_when_disabled()
+                && !interaction.message.flags.is_some_and(|flags| {
+                    flags.contains(MessageFlags::IS_COMPONENTS_V2)
+                });
+
+            if strip {
+                let response = CreateInteractionResponse::UpdateMessage(
+                    CreateInteractionResponseMessage::new().components(Vec::new()),
+                );
+                if let Err(e) =
+                    interaction.create_response(&ctx.http, response).await
+                {
+                    warn!(?e, "failed to strip components of disabled module");
+                }
+                let followup = CreateInteractionResponseFollowup::new()
+                    .ephemeral(true)
+                    .content(MODULE_OFF);
+                if let Err(e) =
+                    interaction.create_followup(&ctx.http, followup).await
+                {
+                    warn!(?e, "failed to send disabled module notice");
+                }
+            } else {
+                reply_component_ephemeral(ctx, interaction, MODULE_OFF.to_string())
+                    .await;
+            }
+            return Some(Ok(()));
+        }
+
+        let required = comp.required_tier();
+        if required != Tier::Free {
+            let scope = interaction.guild_id.map_or_else(
+                || EntitlementScope::User(interaction.user.id.get()),
+                |gid| {
+                    EntitlementScope::UserInGuild(
+                        interaction.user.id.get(),
+                        gid.get(),
+                    )
+                },
+            );
+            if !app.entitlements.allows(scope, required).await {
+                reply_component_ephemeral(ctx, interaction, upgrade_message(&app))
+                    .await;
+                return Some(Ok(()));
+            }
+        }
+
         let cx = ComponentCtx { ctx, interaction, app };
         Some(comp.run(&cx).await)
     }
@@ -232,6 +217,29 @@ async fn module_disabled(app: &AppState, guild_id: GuildId, module: &str) -> boo
             warn!(?e, %guild_id, module, "failed to read module state; allowing command");
             false
         },
+    }
+}
+
+fn upgrade_message(app: &AppState) -> String {
+    app.upgrade_url.as_deref().map_or_else(
+        || "This command requires a premium subscription.".to_string(),
+        |url| {
+            format!("This command requires a premium subscription. Upgrade at {url}")
+        },
+    )
+}
+
+async fn reply_component_ephemeral(
+    ctx: &Context,
+    interaction: &ComponentInteraction,
+    content: String,
+) {
+    let response = CreateInteractionResponse::Message(
+        CreateInteractionResponseMessage::new().ephemeral(true).content(content),
+    );
+
+    if let Err(e) = interaction.create_response(&ctx.http, response).await {
+        warn!(?e, "failed to send ephemeral component reply");
     }
 }
 

@@ -8,26 +8,22 @@ use serenity::prelude::Context;
 use tokio::sync::RwLock;
 use tracing::{debug, error, trace, warn};
 use zayden_app::state::AppState;
+use zayden_core::ctx::EventCtx;
+use zayden_core::module::Screen;
 
 mod entitlement;
 mod guild_create;
 mod guild_delete;
-mod guild_member_remove;
 mod guild_update;
 mod interaction;
-mod message_create;
-mod presence_update;
-mod reaction_add;
-mod reaction_remove;
 mod ready;
-mod thread_create;
-mod thread_delete;
-mod voice_state_update;
 
+use crate::modules::ModuleSet;
 use crate::{BotState, CommandRegistry};
 
 pub struct Handler {
     pub app: Arc<AppState>,
+    pub modules: Arc<ModuleSet>,
     pub bot_state: Arc<RwLock<BotState>>,
     pub registry: Arc<CommandRegistry>,
     pub cron_started: OnceLock<()>,
@@ -141,6 +137,16 @@ impl EventHandler for Handler {
 
         let pool = self.app.db.clone();
 
+        let cx = EventCtx { ctx, app: Arc::clone(&self.app) };
+
+        if let FullEvent::Message { new_message, .. } = ev
+            && !new_message.author.bot()
+            && self.modules.screen_message(&cx, new_message).await
+                == Screen::Consumed
+        {
+            return;
+        }
+
         let result = match ev {
             FullEvent::GuildCreate { guild, .. } => {
                 Self::guild_create(self, ctx, guild, &pool).await
@@ -151,40 +157,14 @@ impl EventHandler for Handler {
             FullEvent::GuildUpdate { new_data, .. } => {
                 Self::guild_update(new_data, &pool).await
             },
-            FullEvent::GuildMemberRemoval { guild_id, user, .. } => {
-                Self::guild_member_remove(*guild_id, user, &pool).await
-            },
-            FullEvent::Message { new_message, .. } => {
-                let app = Arc::clone(&self.app);
-                Self::message_create(ctx, new_message, &pool, app).await
-            },
-            FullEvent::ReactionAdd { add_reaction, .. } => {
-                Self::reaction_add(ctx, add_reaction, &pool).await
-            },
-            FullEvent::ReactionRemove { removed_reaction, .. } => {
-                Self::reaction_remove(ctx, removed_reaction, &pool).await
-            },
-            FullEvent::PresenceUpdate { new_data, .. } => {
-                Self::presence_update(ctx, new_data);
-                Ok(())
-            },
 
             FullEvent::Ready { data_about_bot, .. } => {
                 Self::ready(self, ctx, data_about_bot).await
-            },
-            FullEvent::VoiceStateUpdate { new, .. } => {
-                Self::voice_state_update(ctx, new, &pool).await
             },
             FullEvent::InteractionCreate { interaction, .. } => {
                 let app = Arc::clone(&self.app);
                 let registry = Arc::clone(&self.registry);
                 Self::interaction_create(ctx, interaction, app, registry).await
-            },
-            FullEvent::ThreadCreate { thread, newly_created, .. } => {
-                Self::thread_create(ctx, thread, *newly_created, &self.app).await
-            },
-            FullEvent::ThreadDelete { thread, .. } => {
-                Self::thread_delete(ctx, thread, &pool, &self.app).await
             },
 
             FullEvent::EntitlementCreate { entitlement, .. } => {
@@ -207,6 +187,10 @@ impl EventHandler for Handler {
                 command = ev_command_name,
                 "error handling event",
             );
+        }
+
+        if !matches!(ev, FullEvent::InteractionCreate { .. }) {
+            self.modules.dispatch(&cx, ev).await;
         }
     }
 
