@@ -4,9 +4,17 @@ use async_trait::async_trait;
 use serenity::all::{CreateCommand, FullEvent, Message};
 use zayden_app::entitlement::Tier;
 
-use crate::ctx::{AutocompleteCtx, ComponentCtx, EventCtx, InvocationCtx, ModalCtx};
+use crate::cron::CronResult;
+use crate::ctx::{
+    AutocompleteCtx,
+    ComponentCtx,
+    EventCtx,
+    InvocationCtx,
+    ModalCtx,
+    StartCtx,
+};
 use crate::dispatch_map::OverlapError;
-use crate::error::HandlerError;
+use crate::error::{HandlerError, ModuleError};
 use crate::registry::RegistryBuilder;
 use crate::scope::{CommandMetadata, CommandScope, IdMatch};
 
@@ -80,6 +88,23 @@ pub trait Module: Send + Sync + 'static {
     ) -> Result<(), HandlerError> {
         Ok(())
     }
+
+    /// Collected once, on the first `Ready`, and only when this process is the
+    /// primary application.
+    fn cron_jobs(&self) -> Vec<CronResult> {
+        Vec::new()
+    }
+
+    /// Runs once per process, on the first `Ready`.
+    fn on_start(&self, _cx: &StartCtx<'_>) {}
+}
+
+pub fn require<T>(
+    module: &'static str,
+    key: &'static str,
+    value: Option<T>,
+) -> Result<T, ModuleError> {
+    value.ok_or(ModuleError::MissingConfig { module, key })
 }
 
 #[async_trait]

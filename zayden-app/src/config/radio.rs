@@ -144,8 +144,8 @@ struct RadioToml {
 pub fn load() -> Result<Vec<RadioStation>> {
     let path = if Path::new("radio.toml").exists() {
         Path::new("radio.toml")
-    } else if Path::new("bot/radio.toml").exists() {
-        Path::new("bot/radio.toml")
+    } else if Path::new("bots/zayden/radio.toml").exists() {
+        Path::new("bots/zayden/radio.toml")
     } else {
         return Ok(Vec::new());
     };

@@ -16,13 +16,23 @@ use serenity::all::{
 use serenity::small_fixed_array::FixedArray;
 
 pub mod cache;
-pub use cache::{EmojiCache, EmojiCacheData, EmojiResult, GuildMembersCache};
+pub use cache::{EmojiCache, EmojiResult};
+
+pub mod state;
+pub use state::RuntimeState;
 
 pub mod cdn;
 pub use cdn::{is_discord_cdn, refresh_attachment_url};
 
 pub mod cron;
-pub use cron::{ActionFn, CronJob, CronJobData, earliest_pending, prune_exhausted};
+pub use cron::{
+    ActionFn,
+    CronJob,
+    CronResult,
+    PendingJob,
+    earliest_pending,
+    prune_exhausted,
+};
 
 pub mod dispatch_map;
 pub use dispatch_map::{DispatchMap, OverlapError};
@@ -44,7 +54,7 @@ pub mod announce;
 pub mod templates;
 
 pub mod error;
-pub use error::{CoreError, HandlerError, Respond};
+pub use error::{CoreError, HandlerError, ModuleError, Respond};
 
 pub mod html;
 
@@ -68,7 +78,15 @@ pub mod timezone;
 pub use timezone::{UserTimezone, locale_to_timezone};
 
 pub mod ctx;
-pub use ctx::{AutocompleteCtx, ComponentCtx, EventCtx, InvocationCtx, ModalCtx};
+pub use ctx::{
+    AutocompleteCtx,
+    ComponentCtx,
+    EventCtx,
+    InvocationCtx,
+    ModalCtx,
+    ModuleCtx,
+    StartCtx,
+};
 
 pub mod module;
 pub use module::{
@@ -79,6 +97,7 @@ pub use module::{
     ModuleComponent,
     ModuleModal,
     Screen,
+    require,
 };
 
 pub mod registry;

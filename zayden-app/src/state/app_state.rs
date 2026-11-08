@@ -83,12 +83,18 @@ impl AppState {
             events,
             http: http_client(),
             discord_token: config.discord_token.clone(),
-            ai_provider_key: config.ai_provider_key.clone(),
+            ai_provider_key: config
+                .ai_provider_key
+                .clone()
+                .unwrap_or_else(|| SecretString::from(String::new())),
             ai_api_endpoint: config.ai_api_endpoint.clone(),
             ai_model: config.ai_model.clone(),
             ai_model_structured: config.ai_model_structured.clone(),
             ai_model_pro: config.ai_model_pro.clone(),
-            google_api_key: config.google_api_key.clone(),
+            google_api_key: config
+                .google_api_key
+                .clone()
+                .unwrap_or_else(|| SecretString::from(String::new())),
             error_log_webhook: config
                 .error_log_webhook
                 .clone()

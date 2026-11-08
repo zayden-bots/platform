@@ -14,7 +14,8 @@ use serenity::all::{
     MessageFlags,
     ModalInteraction,
 };
-use tracing::warn;
+use tracing::field::Empty;
+use tracing::{Instrument, info_span, warn};
 use zayden_app::entitlement::{EntitlementScope, Tier};
 use zayden_app::modules::ModuleStates;
 use zayden_app::state::AppState;
@@ -95,11 +96,18 @@ impl CommandRegistry {
         app: Arc<AppState>,
     ) -> Option<Result<(), HandlerError>> {
         let cmd = Arc::clone(self.commands.get(interaction.data.name.as_str())?);
+        let span = info_span!(
+            "command",
+            module = cmd.module().unwrap_or("core"),
+            command = &*cmd.name(),
+            outcome = Empty,
+        );
 
         if let (Some(module), Some(guild_id)) = (cmd.module(), interaction.guild_id)
             && module_disabled(&app, guild_id, module).await
         {
             reply_ephemeral(ctx, interaction, MODULE_OFF.to_string()).await;
+            span.record("outcome", "disabled");
             return Some(Ok(()));
         }
 
@@ -116,12 +124,15 @@ impl CommandRegistry {
             );
             if !app.entitlements.allows(scope, required).await {
                 reply_ephemeral(ctx, interaction, upgrade_message(&app)).await;
+                span.record("outcome", "upgrade_required");
                 return Some(Ok(()));
             }
         }
 
         let cx = InvocationCtx { ctx, interaction, app };
-        Some(cmd.run(&cx).await)
+        let result = cmd.run(&cx).instrument(span.clone()).await;
+        span.record("outcome", outcome(&result));
+        Some(result)
     }
 
     pub async fn run_component(
@@ -131,6 +142,11 @@ impl CommandRegistry {
         app: Arc<AppState>,
     ) -> Option<Result<(), HandlerError>> {
         let comp = Arc::clone(self.components.lookup(&interaction.data.custom_id)?);
+        let span = info_span!(
+            "component",
+            module = comp.module().unwrap_or("core"),
+            outcome = Empty,
+        );
 
         if let (Some(module), Some(guild_id)) = (comp.module(), interaction.guild_id)
             && module_disabled(&app, guild_id, module).await
@@ -161,6 +177,7 @@ impl CommandRegistry {
                 reply_component_ephemeral(ctx, interaction, MODULE_OFF.to_string())
                     .await;
             }
+            span.record("outcome", "disabled");
             return Some(Ok(()));
         }
 
@@ -178,12 +195,15 @@ impl CommandRegistry {
             if !app.entitlements.allows(scope, required).await {
                 reply_component_ephemeral(ctx, interaction, upgrade_message(&app))
                     .await;
+                span.record("outcome", "upgrade_required");
                 return Some(Ok(()));
             }
         }
 
         let cx = ComponentCtx { ctx, interaction, app };
-        Some(comp.run(&cx).await)
+        let result = comp.run(&cx).instrument(span.clone()).await;
+        span.record("outcome", outcome(&result));
+        Some(result)
     }
 
     pub async fn run_modal(
@@ -218,6 +238,10 @@ async fn module_disabled(app: &AppState, guild_id: GuildId, module: &str) -> boo
             false
         },
     }
+}
+
+const fn outcome<T, E>(result: &Result<T, E>) -> &'static str {
+    if result.is_ok() { "ok" } else { "error" }
 }
 
 fn upgrade_message(app: &AppState) -> String {

@@ -10,6 +10,7 @@ use tracing::{debug, error, trace, warn};
 use zayden_app::state::AppState;
 use zayden_core::ctx::EventCtx;
 use zayden_core::module::Screen;
+use zayden_core::{CronJob, RuntimeState};
 
 mod entitlement;
 mod guild_create;
@@ -18,15 +19,16 @@ mod guild_update;
 mod interaction;
 mod ready;
 
+use crate::CommandRegistry;
 use crate::modules::ModuleSet;
-use crate::{BotState, CommandRegistry};
 
 pub struct Handler {
     pub app: Arc<AppState>,
     pub modules: Arc<ModuleSet>,
-    pub bot_state: Arc<RwLock<BotState>>,
+    pub bot_state: Arc<RwLock<RuntimeState>>,
     pub registry: Arc<CommandRegistry>,
     pub cron_started: OnceLock<()>,
+    pub primary_jobs: Vec<CronJob>,
 }
 
 #[async_trait]

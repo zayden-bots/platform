@@ -1,18 +1,31 @@
-use zayden_core::CoreError;
 use zayden_core::error::{HandlerError, Respond};
+use zayden_core::{CoreError, ModuleError};
 
 pub type Result<T> = std::result::Result<T, BotError>;
 
 #[derive(Debug)]
-pub enum BotError {
-    Jellyfin(jellyfin::JellyfinError),
-    Music(music::MusicError),
+pub struct ModuleErrors(pub Vec<ModuleError>);
 
+impl std::fmt::Display for ModuleErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (idx, error) in self.0.iter().enumerate() {
+            if idx > 0 {
+                f.write_str("; ")?;
+            }
+            error.fmt(f)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub enum BotError {
     ZaydenCore(CoreError),
 
     Config(zayden_app::AppError),
     CustomBot(zayden_app::custom_bots::CustomBotError),
     Jiff(jiff::Error),
+    Modules(ModuleErrors),
     Other(String),
 }
 
@@ -21,11 +34,10 @@ impl std::fmt::Display for BotError {
         match self {
             Self::ZaydenCore(e) => e.fmt(f),
 
-            Self::Jellyfin(e) => e.fmt(f),
-            Self::Music(e) => e.fmt(f),
             Self::Config(e) => e.fmt(f),
             Self::CustomBot(e) => e.fmt(f),
             Self::Jiff(e) => e.fmt(f),
+            Self::Modules(e) => e.fmt(f),
             Self::Other(msg) => write!(f, "{msg}"),
         }
     }
@@ -34,13 +46,11 @@ impl std::fmt::Display for BotError {
 impl std::error::Error for BotError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Jellyfin(e) => Some(e),
-            Self::Music(e) => Some(e),
             Self::Config(e) => Some(e),
             Self::CustomBot(e) => Some(e),
             Self::ZaydenCore(e) => Some(e),
             Self::Jiff(e) => Some(e),
-            Self::Other(_) => None,
+            Self::Modules(_) | Self::Other(_) => None,
         }
     }
 }
@@ -48,28 +58,14 @@ impl std::error::Error for BotError {
 impl Respond for BotError {
     fn user_message(&self) -> Option<std::borrow::Cow<'_, str>> {
         match self {
-            Self::Jellyfin(e) => e.user_message(),
-            Self::Music(e) => e.user_message(),
-
             Self::ZaydenCore(e) => e.user_message(),
 
             Self::Config(_)
             | Self::CustomBot(_)
             | Self::Jiff(_)
+            | Self::Modules(_)
             | Self::Other(_) => None,
         }
-    }
-}
-
-impl From<jellyfin::JellyfinError> for BotError {
-    fn from(e: jellyfin::JellyfinError) -> Self {
-        Self::Jellyfin(e)
-    }
-}
-
-impl From<music::MusicError> for BotError {
-    fn from(e: music::MusicError) -> Self {
-        Self::Music(e)
     }
 }
 
@@ -88,18 +84,6 @@ impl From<sqlx::Error> for BotError {
 impl From<jiff::Error> for BotError {
     fn from(e: jiff::Error) -> Self {
         Self::Jiff(e)
-    }
-}
-
-impl From<bungie_api::BungieApiError> for BotError {
-    fn from(e: bungie_api::BungieApiError) -> Self {
-        Self::Other(e.to_string())
-    }
-}
-
-impl From<deadlock::DeadlockError> for BotError {
-    fn from(e: deadlock::DeadlockError) -> Self {
-        Self::Other(e.to_string())
     }
 }
 

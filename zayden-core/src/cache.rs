@@ -1,11 +1,9 @@
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::sync::Arc;
 use std::time::Duration;
 
 use base64::Engine;
 use base64::engine::general_purpose;
-use dashmap::DashMap;
 use reqwest::header::{
     AUTHORIZATION,
     HeaderMap,
@@ -15,17 +13,7 @@ use reqwest::header::{
 };
 use reqwest::{Client, ClientBuilder, StatusCode};
 use serde::Deserialize;
-use serenity::all::{
-    ApplicationId,
-    Context,
-    DataUri,
-    Emoji,
-    EmojiId,
-    Guild,
-    GuildId,
-    HttpError,
-    UserId,
-};
+use serenity::all::{ApplicationId, Context, DataUri, Emoji, EmojiId, HttpError};
 use serenity::small_fixed_array::FixedString;
 use tracing::{error, warn};
 
@@ -36,21 +24,6 @@ const PARENT_EMOJI_MAX_WAIT: Duration = Duration::from_secs(30);
 const LOGGED_BODY_LIMIT: usize = 512;
 
 pub type EmojiResult<T> = Result<T, String>;
-
-pub trait GuildMembersCache: Send + Sync + 'static {
-    fn get(&self) -> &DashMap<GuildId, Vec<UserId>>;
-
-    fn guild_create(&self, guild: &Guild) {
-        self.get()
-            .insert(guild.id, guild.members.iter().map(|x| x.user.id).collect());
-    }
-}
-
-pub trait EmojiCacheData: Send + Sync + 'static {
-    fn emojis(&self) -> Arc<EmojiCache>;
-
-    fn emojis_mut(&mut self) -> &mut EmojiCache;
-}
 
 #[derive(Clone, Default)]
 pub struct EmojiCache(HashMap<FixedString<u8>, EmojiId>);

@@ -3,10 +3,10 @@ use sqlx::PgPool;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 use zayden_app::guilds::{GuildOwner, GuildPresence, JoinKind};
-use zayden_core::as_i64;
+use zayden_core::{RuntimeState, as_i64};
 
 use super::Handler;
-use crate::{BotState, Result, module_sync};
+use crate::{Result, module_sync};
 
 impl Handler {
     pub async fn guild_create(
@@ -45,9 +45,7 @@ impl Handler {
             warn!(error = ?e, guild_id = %guild.id, "failed to record guild owner");
         }
 
-        let data = ctx.data::<RwLock<BotState>>();
-
-        BotState::guild_create(data, guild).await;
+        ctx.data::<RwLock<RuntimeState>>().read().await.guild_create(guild);
 
         let states = module_sync::seed(
             &ctx.http,

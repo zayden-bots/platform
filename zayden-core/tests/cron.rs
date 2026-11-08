@@ -58,7 +58,7 @@ macro_rules! utc {
 /// The first pending run time, or a test failure.
 macro_rules! first_run {
     ($pending:expr) => {
-        $pending.first().expect("a job is pending").0.clone()
+        $pending.first().expect("a job is pending").at.clone()
     };
 }
 
@@ -146,7 +146,7 @@ fn jobs_tied_at_the_earliest_run_time_all_fire() {
     let pending = earliest_pending(&jobs, &friday);
 
     assert_eq!(pending.len(), 3, "all three are due at 17:00");
-    assert!(pending.iter().all(|(t, _)| *t == utc!(2026, 8, 7, 17, 0, 0)));
+    assert!(pending.iter().all(|p| p.at == utc!(2026, 8, 7, 17, 0, 0)));
 }
 
 /// The run time is always strictly in the future, so the old `t > now` half of

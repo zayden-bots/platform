@@ -90,6 +90,27 @@ impl From<CoreError> for HandlerError {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ModuleError {
+    #[error("module `{module}` requires `{key}`, which is not set")]
+    MissingConfig { module: &'static str, key: &'static str },
+    #[error("module `{module}` failed to initialise")]
+    Init {
+        module: &'static str,
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+}
+
+impl ModuleError {
+    pub fn init(
+        module: &'static str,
+        source: impl Into<Box<dyn std::error::Error + Send + Sync>>,
+    ) -> Self {
+        Self::Init { module, source: source.into() }
+    }
+}
+
 #[derive(Debug)]
 pub enum CoreError {
     MissingGuildId,

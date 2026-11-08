@@ -107,10 +107,10 @@ pub struct YoutubeConfig {
 #[derive(Debug, Clone)]
 pub struct BotConfig {
     pub discord_token: SecretString,
-    pub bungie_api_key: SecretString,
-    pub ai_provider_key: SecretString,
-    pub google_api_key: SecretString,
-    pub discord_client_secret: SecretString,
+    pub bungie_api_key: Option<SecretString>,
+    pub ai_provider_key: Option<SecretString>,
+    pub google_api_key: Option<SecretString>,
+    pub discord_client_secret: Option<SecretString>,
     pub spotify: Option<SpotifyCredentials>,
 
     pub ai_api_endpoint: String,
@@ -165,10 +165,12 @@ pub struct BotConfig {
 impl BotConfig {
     pub async fn load(pool: &PgPool) -> Result<Self> {
         let discord_token = require_env("DISCORD_TOKEN")?.into();
-        let bungie_api_key = require_env("BUNGIE_API_KEY")?.into();
-        let ai_provider_key = require_env("AI_PROVIDER_KEY")?.into();
-        let google_api_key = require_env("GOOGLE_API_KEY")?.into();
-        let discord_client_secret = require_env("DISCORD_CLIENT_SECRET")?.into();
+        let bungie_api_key = env::var("BUNGIE_API_KEY").ok().map(SecretString::from);
+        let ai_provider_key =
+            env::var("AI_PROVIDER_KEY").ok().map(SecretString::from);
+        let google_api_key = env::var("GOOGLE_API_KEY").ok().map(SecretString::from);
+        let discord_client_secret =
+            env::var("DISCORD_CLIENT_SECRET").ok().map(SecretString::from);
         let spotify = match (
             env::var("SPOTIFY_CLIENT_ID"),
             env::var("SPOTIFY_CLIENT_SECRET"),
@@ -577,8 +579,8 @@ fn save_dir_from_path(save_path: &str) -> PathBuf {
 fn load_toml_config() -> Result<TomlConfig> {
     let path = if Path::new("config.toml").exists() {
         Path::new("config.toml")
-    } else if Path::new("bot/config.toml").exists() {
-        Path::new("bot/config.toml")
+    } else if Path::new("bots/zayden/config.toml").exists() {
+        Path::new("bots/zayden/config.toml")
     } else {
         return Ok(TomlConfig::default());
     };

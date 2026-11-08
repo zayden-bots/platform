@@ -4,13 +4,12 @@ use std::sync::Arc;
 use serenity::all::{Context, OnlineStatus, Ready};
 use tracing::{info, warn};
 use zayden_app::guilds::{GuildPresence, Shard};
-use zayden_core::as_i64;
+use zayden_core::{StartCtx, as_i64};
 
-use crate::cron::start_cron_jobs;
+use crate::cron::{EntitlementSweepCron, collect_jobs, start_cron_jobs};
 use crate::handler::Handler;
-use crate::patreon_webhook::spawn_patreon_listener;
-use crate::youtube_webhook::spawn_youtube_listener;
-use crate::{BotState, Result, module_sync};
+use crate::state::load_emojis;
+use crate::{Result, module_sync};
 
 impl Handler {
     pub async fn ready(&self, ctx: &Context, ready: &Ready) -> Result<()> {
@@ -24,7 +23,7 @@ impl Handler {
         ctx.set_presence(None, OnlineStatus::Online);
 
         let pool = self.app.db.clone();
-        BotState::ready(ctx, ready, &pool, self.app.zayden_id).await?;
+        load_emojis(ctx, ready, &pool, self.app.zayden_id).await?;
         Self::reconcile_presence(ready, &pool).await;
 
         if self.cron_started.set(()).is_ok() {
@@ -62,18 +61,27 @@ impl Handler {
     }
 
     async fn background_tasks(&self, ctx: &Context, ready: &Ready) {
-        if ready.application.id.get() == self.app.zayden_id {
-            self.bot_state.write().await.setup_static_cron();
+        let primary = ready.application.id.get() == self.app.zayden_id;
 
-            spawn_patreon_listener(ctx.clone(), Arc::clone(&self.app));
-            let youtube = self.bot_state.read().await.youtube.clone();
-            if let Some(runtime) = youtube {
-                spawn_youtube_listener(ctx.clone(), Arc::clone(&self.app), runtime);
+        if primary {
+            {
+                let mut state = self.bot_state.write().await;
+                state.jobs_mut().extend(collect_jobs(self.modules.cron_jobs()));
+                state.jobs_mut().extend(self.primary_jobs.iter().cloned());
+                state.jobs_mut().extend(collect_jobs(vec![
+                    EntitlementSweepCron::cron_job(Arc::clone(
+                        &self.app.entitlements,
+                    )),
+                ]));
             }
         }
 
-        let palworld = Arc::clone(&self.bot_state.read().await.palworld);
-        tokio::spawn(async move { palworld.warm().await });
+        self.modules.start(&StartCtx {
+            ctx,
+            app: Arc::clone(&self.app),
+            ready,
+            primary,
+        });
 
         module_sync::spawn_listener(
             Arc::clone(&ctx.http),
@@ -81,14 +89,6 @@ impl Handler {
             Arc::clone(&self.registry),
             ready.application.id,
         );
-        destiny2::spawn_cache_listener(Arc::clone(&self.app));
-
-        let http = Arc::clone(&ctx.http);
-        let app = Arc::clone(&self.app);
-        let guilds = ready.guilds.iter().map(|guild| guild.id).collect::<Vec<_>>();
-        tokio::spawn(async move {
-            ticket::archive::rebuild(&http, &app, &guilds).await;
-        });
 
         let ctx = ctx.clone();
         let pool = self.app.db.clone();

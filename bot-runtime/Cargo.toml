@@ -1,0 +1,52 @@
+[package]
+name = "bot-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+zayden-core = { workspace = true }
+zayden-app = { workspace = true }
+
+async-trait = { workspace = true }
+dotenvy = { workspace = true }
+futures = { workspace = true, features = ["async-await"] }
+jiff = { workspace = true }
+jiff-cron = { workspace = true }
+metrics = { workspace = true }
+rustls = { workspace = true, features = ["aws-lc-rs"] }
+secrecy = { workspace = true }
+serenity = { workspace = true, features = [
+    "rustls_backend",
+    "builder",
+    "gateway",
+    "transport_compression_zlib",
+    "transport_compression_zstd",
+] }
+songbird = { workspace = true, features = [
+    "driver",
+    "gateway",
+    "rustls",
+    "serenity",
+    "tungstenite",
+] }
+sqlx = { workspace = true, features = [
+    "macros",
+    "migrate",
+    "bigdecimal",
+    "postgres",
+    "tls-rustls-aws-lc-rs",
+    "runtime-tokio",
+] }
+tokio = { workspace = true, features = ["rt-multi-thread", "time"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["ansi", "fmt", "json"] }

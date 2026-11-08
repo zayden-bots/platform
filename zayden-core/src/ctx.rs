@@ -8,8 +8,22 @@ use serenity::all::{
     CreateInteractionResponse,
     CreateInteractionResponseMessage,
     ModalInteraction,
+    Ready,
 };
+use zayden_app::config::BotConfig;
 use zayden_app::state::AppState;
+
+pub struct ModuleCtx<'a> {
+    pub app: &'a Arc<AppState>,
+    pub config: &'a BotConfig,
+}
+
+pub struct StartCtx<'a> {
+    pub ctx: &'a Context,
+    pub app: Arc<AppState>,
+    pub ready: &'a Ready,
+    pub primary: bool,
+}
 
 pub struct InvocationCtx<'a> {
     pub ctx: &'a Context,

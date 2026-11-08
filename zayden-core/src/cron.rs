@@ -15,10 +15,12 @@ pub type ActionFn = Arc<
         + Sync,
 >;
 
-pub trait CronJobData: Send + Sync + 'static {
-    fn jobs(&self) -> &[CronJob];
+pub type CronResult = Result<CronJob, jiff_cron::error::Error>;
 
-    fn jobs_mut(&mut self) -> &mut Vec<CronJob>;
+pub struct PendingJob {
+    pub at: Zoned,
+    pub id: String,
+    pub action: ActionFn,
 }
 
 #[derive(Clone)]
@@ -79,20 +81,26 @@ pub fn prune_exhausted(jobs: &mut Vec<CronJob>, now: &Zoned) {
 }
 
 #[must_use]
-pub fn earliest_pending(jobs: &[CronJob], now: &Zoned) -> Vec<(Zoned, ActionFn)> {
-    let mut pending: Vec<(Zoned, ActionFn)> = Vec::new();
+pub fn earliest_pending(jobs: &[CronJob], now: &Zoned) -> Vec<PendingJob> {
+    let mut pending: Vec<PendingJob> = Vec::new();
 
     for job in jobs {
         let Some(run_time) = next_run(job, now) else {
             continue;
         };
 
-        match pending.first().map(|(t, _)| run_time.cmp(t)) {
+        let entry = PendingJob {
+            at: run_time,
+            id: job.id.clone(),
+            action: Arc::clone(&job.action_fn),
+        };
+
+        match pending.first().map(|p| entry.at.cmp(&p.at)) {
             Some(Ordering::Less) | None => {
-                pending = vec![(run_time, Arc::clone(&job.action_fn))];
+                pending = vec![entry];
             },
             Some(Ordering::Equal) => {
-                pending.push((run_time, Arc::clone(&job.action_fn)));
+                pending.push(entry);
             },
             Some(Ordering::Greater) => {},
         }
