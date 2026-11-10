@@ -3,7 +3,9 @@ use std::borrow::Cow;
 use async_trait::async_trait;
 use serenity::all::{CreateCommand, FullEvent, Message};
 use zayden_app::entitlement::Tier;
+use zayden_app::tasks::Task;
 
+use crate::Identity;
 use crate::cron::CronResult;
 use crate::ctx::{
     AutocompleteCtx,
@@ -12,6 +14,7 @@ use crate::ctx::{
     InvocationCtx,
     ModalCtx,
     StartCtx,
+    TaskCtx,
 };
 use crate::dispatch_map::OverlapError;
 use crate::error::{HandlerError, ModuleError};
@@ -89,10 +92,27 @@ pub trait Module: Send + Sync + 'static {
         Ok(())
     }
 
-    /// Collected once, on the first `Ready`, and only when this process is the
-    /// primary application.
-    fn cron_jobs(&self) -> Vec<CronResult> {
+    /// Runs in every bot process; act only on rows this application authored.
+    fn entity_jobs(&self, _me: Identity) -> Vec<CronResult> {
         Vec::new()
+    }
+
+    /// Runs only in the primary process until the worker exists.
+    fn worker_jobs(&self) -> Vec<CronResult> {
+        Vec::new()
+    }
+
+    /// Kinds this module runs from `scheduled_tasks`; unique across a bot's modules.
+    fn task_kinds(&self) -> &'static [&'static str] {
+        &[]
+    }
+
+    async fn run_task(
+        &self,
+        _cx: &TaskCtx<'_>,
+        _task: &Task,
+    ) -> Result<(), HandlerError> {
+        Ok(())
     }
 
     /// Runs once per process, on the first `Ready`.

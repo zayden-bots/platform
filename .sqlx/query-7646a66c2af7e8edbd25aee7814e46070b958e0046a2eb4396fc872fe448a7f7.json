@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT min(run_at) AS \"next: jiff_sqlx::Timestamp\"\n               FROM scheduled_tasks\n               WHERE application_id = $1 AND kind = ANY($2)\n                 AND claimed_at IS NULL AND attempts < $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "next: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "TextArray",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "7646a66c2af7e8edbd25aee7814e46070b958e0046a2eb4396fc872fe448a7f7"
+}

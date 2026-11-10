@@ -3,9 +3,17 @@ use std::collections::{HashMap, HashSet};
 use futures::future::join_all;
 use serenity::all::{FullEvent, Message};
 use tracing::error;
-use zayden_core::ctx::{EventCtx, StartCtx};
+use zayden_app::tasks::Task;
+use zayden_core::ctx::{EventCtx, StartCtx, TaskCtx};
 use zayden_core::module::{EventKind, Module, Screen};
-use zayden_core::{CronResult, ModuleError, OverlapError, RegistryBuilder};
+use zayden_core::{
+    CronResult,
+    HandlerError,
+    Identity,
+    ModuleError,
+    OverlapError,
+    RegistryBuilder,
+};
 
 use crate::BotError;
 use crate::error::ModuleErrors;
@@ -13,6 +21,21 @@ use crate::error::ModuleErrors;
 pub struct ModuleSet {
     modules: Vec<Box<dyn Module>>,
     routes: HashMap<EventKind, Vec<usize>>,
+    task_routes: HashMap<&'static str, usize>,
+}
+
+fn task_routes(
+    modules: &[Box<dyn Module>],
+) -> Result<HashMap<&'static str, usize>, BotError> {
+    let mut routes = HashMap::new();
+    for (idx, module) in modules.iter().enumerate() {
+        for kind in module.task_kinds() {
+            if routes.insert(*kind, idx).is_some() {
+                return Err(BotError::DuplicateTaskKind(kind));
+            }
+        }
+    }
+    Ok(routes)
 }
 
 impl ModuleSet {
@@ -30,7 +53,9 @@ impl ModuleSet {
             }
         }
 
-        Ok(Self { modules, routes })
+        let task_routes = task_routes(&modules)?;
+
+        Ok(Self { modules, routes, task_routes })
     }
 
     pub fn ids(&self) -> Vec<String> {
@@ -47,8 +72,26 @@ impl ModuleSet {
         Ok(())
     }
 
-    pub fn cron_jobs(&self) -> Vec<CronResult> {
-        self.modules.iter().flat_map(|module| module.cron_jobs()).collect()
+    pub fn entity_jobs(&self, me: Identity) -> Vec<CronResult> {
+        self.modules.iter().flat_map(|module| module.entity_jobs(me)).collect()
+    }
+
+    pub fn worker_jobs(&self) -> Vec<CronResult> {
+        self.modules.iter().flat_map(|module| module.worker_jobs()).collect()
+    }
+
+    pub fn task_kinds(&self) -> Vec<&'static str> {
+        self.modules.iter().flat_map(|module| module.task_kinds()).copied().collect()
+    }
+
+    pub async fn run_task(
+        &self,
+        cx: &TaskCtx<'_>,
+        task: &Task,
+    ) -> Option<Result<(), HandlerError>> {
+        let idx = *self.task_routes.get(task.kind.as_str())?;
+        let module = self.modules.get(idx)?;
+        Some(module.run_task(cx, task).await)
     }
 
     pub fn start(&self, cx: &StartCtx<'_>) {
@@ -143,6 +186,7 @@ impl ModuleList {
         self,
         primary_jobs: Vec<CronResult>,
     ) -> Result<Assembly, BotError> {
+        task_routes(&self.modules)?;
         if self.errors.is_empty() {
             Ok(Assembly { modules: self.modules, primary_jobs })
         } else {

@@ -29,6 +29,12 @@ pub struct StartCtx<'a> {
     pub me: Identity,
 }
 
+pub struct TaskCtx<'a> {
+    pub ctx: &'a Context,
+    pub app: Arc<AppState>,
+    pub me: Identity,
+}
+
 pub struct InvocationCtx<'a> {
     pub ctx: &'a Context,
     pub interaction: &'a CommandInteraction,

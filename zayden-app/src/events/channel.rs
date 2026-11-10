@@ -14,10 +14,11 @@ pub enum Channel {
     ServingChanged,
     CustomBotsChanged,
     LoadoutsChanged,
+    TaskScheduled,
 }
 
 impl Channel {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::ConfigChanged,
         Self::ModulesChanged,
         Self::EntitlementChanged,
@@ -27,6 +28,7 @@ impl Channel {
         Self::ServingChanged,
         Self::CustomBotsChanged,
         Self::LoadoutsChanged,
+        Self::TaskScheduled,
     ];
 
     #[must_use]
@@ -41,6 +43,7 @@ impl Channel {
             Self::ServingChanged => "serving_changed",
             Self::CustomBotsChanged => "custom_bots_changed",
             Self::LoadoutsChanged => "loadouts_changed",
+            Self::TaskScheduled => "task_scheduled",
         }
     }
 
@@ -71,6 +74,7 @@ impl Channel {
                 AppEvent::CustomBotsChanged(payload.parse().ok()?)
             },
             Self::LoadoutsChanged => AppEvent::LoadoutsChanged,
+            Self::TaskScheduled => AppEvent::TaskScheduled(payload.parse().ok()?),
         };
 
         Some(event)

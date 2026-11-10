@@ -1,0 +1,115 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE scheduled_tasks t\n               SET claimed_at = now(), attempts = t.attempts + 1\n               FROM (\n                   SELECT id FROM scheduled_tasks\n                   WHERE application_id = $1 AND kind = ANY($2)\n                     AND claimed_at IS NULL\n                     AND run_at <= now() AND attempts < $4\n                   ORDER BY run_at\n                   LIMIT $3\n                   FOR UPDATE SKIP LOCKED\n               ) due\n               WHERE t.id = due.id\n               RETURNING t.id AS \"id!\",\n                         t.application_id AS \"application_id!\",\n                         t.kind AS \"kind!\",\n                         t.key AS \"key!\",\n                         t.run_at AS \"run_at!: jiff_sqlx::Timestamp\",\n                         t.payload AS \"payload!\",\n                         t.claimed_at AS \"claimed_at!: jiff_sqlx::Timestamp\",\n                         t.attempts AS \"attempts!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "application_id!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "application_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "kind!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "key!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "key"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "run_at!: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "run_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "payload!",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "payload"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "claimed_at!: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "claimed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "attempts!",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "attempts"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "TextArray",
+        "Int8",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "c862b1db048c7aaa9f4a2c6a32fc699c318773b1e8aa07a6ba4c47cfde9decef"
+}

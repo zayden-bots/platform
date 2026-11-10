@@ -22,8 +22,10 @@ moka = { workspace = true, features = ["future"] }
 reqwest = { workspace = true, features = ["rustls", "json"] }
 secrecy = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["std"] }
 sqlx = { workspace = true, features = [
   "derive",
+  "json",
   "migrate",
   "postgres",
   "runtime-tokio",
@@ -37,5 +39,4 @@ tracing = { workspace = true }
 [dev-dependencies]
 jiff = { workspace = true }
 schema = { workspace = true }
-serde_json = { workspace = true, features = ["std"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

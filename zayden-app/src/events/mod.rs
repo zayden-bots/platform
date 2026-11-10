@@ -17,5 +17,6 @@ pub enum AppEvent {
     ServingChanged(u64),
     CustomBotsChanged(u64),
     LoadoutsChanged,
+    TaskScheduled(u64),
     Resync,
 }

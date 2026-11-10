@@ -1,0 +1,114 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM scheduled_tasks\n               WHERE application_id = $1\n                 AND claimed_at < now() - make_interval(secs => $2)\n                 AND attempts >= $3\n               RETURNING id AS \"id!\",\n                         application_id AS \"application_id!\",\n                         kind AS \"kind!\",\n                         key AS \"key!\",\n                         run_at AS \"run_at!: jiff_sqlx::Timestamp\",\n                         payload AS \"payload!\",\n                         claimed_at AS \"claimed_at!: jiff_sqlx::Timestamp\",\n                         attempts AS \"attempts!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "application_id!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "application_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "kind!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "key!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "key"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "run_at!: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "run_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "payload!",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "payload"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "claimed_at!: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "claimed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "attempts!",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "attempts"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Float8",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "f182d64bc800e9a3c4b669555d5c19adedbe87231bc88e4a9a5acd16d734bb37"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE scheduled_tasks\n         SET claimed_at = now() - interval '1 hour',\n             attempts = CASE WHEN key = 't:drop' THEN 5 ELSE 1 END",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "1a8b760f1d7f080d9f3a4ebb03907c9d843f9f5304f6b172c7b2cc330b2484c6"
+}

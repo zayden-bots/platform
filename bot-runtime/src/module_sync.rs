@@ -230,7 +230,8 @@ pub fn spawn_listener(
                     | AppEvent::HostingPaid(_)
                     | AppEvent::ServingChanged(_)
                     | AppEvent::CustomBotsChanged(_)
-                    | AppEvent::LoadoutsChanged,
+                    | AppEvent::LoadoutsChanged
+                    | AppEvent::TaskScheduled(_),
                 ) => {},
                 Err(RecvError::Lagged(n)) => {
                     warn!(

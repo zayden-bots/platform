@@ -9,7 +9,7 @@ use zayden_core::{StartCtx, as_i64};
 use crate::cron::{EntitlementSweepCron, collect_jobs, start_cron_jobs};
 use crate::handler::Handler;
 use crate::state::load_emojis;
-use crate::{Result, module_sync, serving_guard};
+use crate::{Result, module_sync, serving_guard, tasks};
 
 impl Handler {
     pub async fn ready(&self, ctx: &Context, ready: &Ready) -> Result<()> {
@@ -63,10 +63,11 @@ impl Handler {
     async fn background_tasks(&self, ctx: &Context, ready: &Ready) {
         let primary = self.me.is_primary();
 
-        if primary {
-            {
-                let mut state = self.bot_state.write().await;
-                state.jobs_mut().extend(collect_jobs(self.modules.cron_jobs()));
+        {
+            let mut state = self.bot_state.write().await;
+            state.jobs_mut().extend(collect_jobs(self.modules.entity_jobs(self.me)));
+            if primary {
+                state.jobs_mut().extend(collect_jobs(self.modules.worker_jobs()));
                 state.jobs_mut().extend(self.primary_jobs.iter().cloned());
                 state.jobs_mut().extend(collect_jobs(vec![
                     EntitlementSweepCron::cron_job(Arc::clone(
@@ -93,6 +94,13 @@ impl Handler {
         serving_guard::spawn_listener(
             Arc::clone(&ctx.http),
             Arc::clone(&self.app),
+            self.me,
+        );
+
+        tasks::spawn_task_runner(
+            ctx.clone(),
+            Arc::clone(&self.app),
+            Arc::clone(&self.modules),
             self.me,
         );
 

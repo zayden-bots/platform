@@ -25,6 +25,7 @@ mod serving_guard;
 pub mod sqlx_lib;
 pub mod state;
 mod status;
+mod tasks;
 pub mod webhook_logger;
 
 pub use error::{BotError, Result};

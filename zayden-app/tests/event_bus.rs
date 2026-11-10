@@ -117,6 +117,15 @@ fn a_bare_guild_id_is_not_a_modules_change() {
     ));
 }
 
+#[test]
+fn a_task_scheduled_carries_the_application() {
+    assert!(matches!(
+        Channel::TaskScheduled.decode("7"),
+        Some(AppEvent::TaskScheduled(7))
+    ));
+    assert!(Channel::TaskScheduled.decode("x").is_none());
+}
+
 #[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_dropped_connection_reconnects_and_asks_for_a_resync(pool: PgPool) {
     let (tx, mut rx) = broadcast::channel(16);

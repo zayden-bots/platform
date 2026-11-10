@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT claimed_at IS NULL AS \"unclaimed!\" FROM scheduled_tasks",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "unclaimed!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "5c1448409e5e12b81943f90f27590f06e9fd0b11be91ca66e11b3669deaff8ce"
+}

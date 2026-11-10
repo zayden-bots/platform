@@ -26,6 +26,7 @@ pub enum BotError {
     Application(zayden_app::applications::ApplicationError),
     Jiff(jiff::Error),
     Modules(ModuleErrors),
+    DuplicateTaskKind(&'static str),
     Other(String),
 }
 
@@ -38,6 +39,9 @@ impl std::fmt::Display for BotError {
             Self::Application(e) => e.fmt(f),
             Self::Jiff(e) => e.fmt(f),
             Self::Modules(e) => e.fmt(f),
+            Self::DuplicateTaskKind(kind) => {
+                write!(f, "task kind {kind} is registered by two modules")
+            },
             Self::Other(msg) => write!(f, "{msg}"),
         }
     }
@@ -50,7 +54,7 @@ impl std::error::Error for BotError {
             Self::Application(e) => Some(e),
             Self::ZaydenCore(e) => Some(e),
             Self::Jiff(e) => Some(e),
-            Self::Modules(_) | Self::Other(_) => None,
+            Self::Modules(_) | Self::DuplicateTaskKind(_) | Self::Other(_) => None,
         }
     }
 }
@@ -64,6 +68,7 @@ impl Respond for BotError {
             | Self::Application(_)
             | Self::Jiff(_)
             | Self::Modules(_)
+            | Self::DuplicateTaskKind(_)
             | Self::Other(_) => None,
         }
     }

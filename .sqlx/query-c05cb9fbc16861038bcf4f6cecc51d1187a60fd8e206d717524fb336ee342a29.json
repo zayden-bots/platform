@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM scheduled_tasks\n             WHERE application_id = $1 AND starts_with(key, $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c05cb9fbc16861038bcf4f6cecc51d1187a60fd8e206d717524fb336ee342a29"
+}

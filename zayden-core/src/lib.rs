@@ -86,6 +86,7 @@ pub use ctx::{
     ModalCtx,
     ModuleCtx,
     StartCtx,
+    TaskCtx,
 };
 
 pub mod identity;

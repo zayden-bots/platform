@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE scheduled_tasks SET claimed_at = NULL\n             WHERE application_id = $1\n               AND claimed_at < now() - make_interval(secs => $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3e6ce347aaaf63fe0fe84313f712d78a99500bf3ecdc981cc55435f61e07ee90"
+}
