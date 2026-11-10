@@ -40,21 +40,6 @@ allow = [
     "CDLA-Permissive-2.0",
 ]
 
-[[licenses.clarify]]
-name = "bungie-api"
-expression = "LicenseRef-Proprietary"
-license-files = []
-
-[[licenses.clarify]]
-name = "deadlock-api"
-expression = "LicenseRef-Proprietary"
-license-files = []
-
-[[licenses.clarify]]
-name = "google-sheets-api"
-expression = "LicenseRef-Proprietary"
-license-files = []
-
 [bans]
 # serenity's `next` branch drags a second major of several crates (reqwest 0.12
 # via songbird, rand 0.8/0.9 via transitive deps). Warn, do not fail.
@@ -75,9 +60,8 @@ allow-git = [
     "https://github.com/serenity-rs/serenity",
     "https://github.com/GnomedDev/serenity",
     "https://github.com/serenity-rs/songbird",
-    "https://github.com/KiloOscarSix/songbird",
     "https://github.com/Erk-/rsget",
-    "https://github.com/ViridianLink/bungie-api.git",
-    "https://github.com/ViridianLink/deadlock-api.git",
-    "https://github.com/ViridianLink/google-sheets-api.git",
 ]
+
+[sources.allow-org]
+github = ["KiloOscarSix", "ViridianLink", "zayden-bots"]
