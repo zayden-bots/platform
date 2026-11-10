@@ -31,11 +31,16 @@ fn later() -> Timestamp {
     clippy::expect_used,
     reason = "a free helper sits outside the #[test] items clippy.toml exempts"
 )]
-async fn mark_seeded(pool: &PgPool, guild_id: i64) {
-    sqlx::query!("UPDATE guilds SET bot_joined_at = now() WHERE id = $1", guild_id)
-        .execute(pool)
-        .await
-        .expect("the seed marker is written");
+async fn mark_seeded(pool: &PgPool, guild_id: i64, application_id: i64) {
+    sqlx::query!(
+        "UPDATE guild_presence SET modules_seeded_at = now()
+         WHERE guild_id = $1 AND application_id = $2",
+        guild_id,
+        application_id
+    )
+    .execute(pool)
+    .await
+    .expect("the seed marker is written");
 }
 
 #[expect(
@@ -224,57 +229,42 @@ async fn reconcile_covers_guilds_stored_before_tracking(pool: PgPool) {
 
 #[test]
 fn an_unseeded_guild_is_a_first_join() {
-    assert_eq!(JoinKind::classify(false, None, false, joined()), JoinKind::First);
+    assert_eq!(JoinKind::classify(None, joined()), JoinKind::First);
+
+    let own =
+        OwnPresence { joined_at: Some(joined()), present: true, seeded: false };
+    assert_eq!(JoinKind::classify(Some(own), joined()), JoinKind::First);
 }
 
 #[test]
 fn the_same_membership_is_a_reconnect() {
-    let own = OwnPresence { joined_at: Some(joined()), present: true };
-    assert_eq!(
-        JoinKind::classify(true, Some(own), true, joined()),
-        JoinKind::Reconnect
-    );
+    let own = OwnPresence { joined_at: Some(joined()), present: true, seeded: true };
+    assert_eq!(JoinKind::classify(Some(own), joined()), JoinKind::Reconnect);
 }
 
 #[test]
 fn a_row_from_before_joined_at_was_tracked_is_a_reconnect() {
-    let own = OwnPresence { joined_at: None, present: true };
-    assert_eq!(
-        JoinKind::classify(true, Some(own), false, later()),
-        JoinKind::Reconnect
-    );
-}
-
-#[test]
-fn joining_beside_a_present_bot_is_additional() {
-    assert_eq!(JoinKind::classify(true, None, true, joined()), JoinKind::Additional);
+    let own = OwnPresence { joined_at: None, present: true, seeded: true };
+    assert_eq!(JoinKind::classify(Some(own), later()), JoinKind::Reconnect);
 }
 
 #[test]
 fn a_reconcile_placeholder_row_does_not_count_as_membership() {
-    let own = OwnPresence { joined_at: None, present: false };
-    assert_eq!(
-        JoinKind::classify(true, Some(own), true, joined()),
-        JoinKind::Additional
-    );
+    let own = OwnPresence { joined_at: None, present: false, seeded: true };
+    assert_eq!(JoinKind::classify(Some(own), joined()), JoinKind::Rejoin);
 }
 
 #[test]
-fn returning_after_every_bot_left_is_a_rejoin() {
-    let own = OwnPresence { joined_at: Some(joined()), present: false };
-    assert_eq!(
-        JoinKind::classify(true, Some(own), false, later()),
-        JoinKind::Rejoin
-    );
+fn returning_after_leaving_is_a_rejoin() {
+    let own =
+        OwnPresence { joined_at: Some(joined()), present: false, seeded: true };
+    assert_eq!(JoinKind::classify(Some(own), later()), JoinKind::Rejoin);
 }
 
 #[test]
 fn being_re_added_while_offline_is_a_rejoin() {
-    let own = OwnPresence { joined_at: Some(joined()), present: true };
-    assert_eq!(
-        JoinKind::classify(true, Some(own), false, later()),
-        JoinKind::Rejoin
-    );
+    let own = OwnPresence { joined_at: Some(joined()), present: true, seeded: true };
+    assert_eq!(JoinKind::classify(Some(own), later()), JoinKind::Rejoin);
 }
 
 #[test]
@@ -282,40 +272,23 @@ fn only_a_rejoin_resets_modules() {
     assert!(JoinKind::Rejoin.resets_modules());
     assert!(!JoinKind::First.resets_modules());
     assert!(!JoinKind::Reconnect.resets_modules());
-    assert!(!JoinKind::Additional.resets_modules());
 }
 
 #[sqlx::test(migrator = "schema::MIGRATOR")]
-async fn a_second_bot_joining_is_additional(pool: PgPool) {
+async fn a_second_application_joining_is_first(pool: PgPool) {
     GuildPresence::joined(&pool, SHARD_0_GUILD, ZAYDEN, joined()).await.unwrap();
-    mark_seeded(&pool, SHARD_0_GUILD).await;
+    mark_seeded(&pool, SHARD_0_GUILD, ZAYDEN).await;
 
     let kind =
         GuildPresence::joined(&pool, SHARD_0_GUILD, VIKTOR, later()).await.unwrap();
 
-    assert_eq!(kind, JoinKind::Additional);
-}
-
-#[sqlx::test(migrator = "schema::MIGRATOR")]
-async fn a_bot_absent_since_reconcile_joining_beside_another_is_additional(
-    pool: PgPool,
-) {
-    GuildPresence::joined(&pool, SHARD_0_GUILD, ZAYDEN, joined()).await.unwrap();
-    mark_seeded(&pool, SHARD_0_GUILD).await;
-    GuildPresence::reconcile(&pool, VIKTOR, Shard { id: 0, total: 1 }, &[])
-        .await
-        .unwrap();
-
-    let kind =
-        GuildPresence::joined(&pool, SHARD_0_GUILD, VIKTOR, later()).await.unwrap();
-
-    assert_eq!(kind, JoinKind::Additional);
+    assert_eq!(kind, JoinKind::First);
 }
 
 #[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_gateway_reconnect_is_a_reconnect(pool: PgPool) {
     GuildPresence::joined(&pool, SHARD_0_GUILD, ZAYDEN, joined()).await.unwrap();
-    mark_seeded(&pool, SHARD_0_GUILD).await;
+    mark_seeded(&pool, SHARD_0_GUILD, ZAYDEN).await;
 
     let kind =
         GuildPresence::joined(&pool, SHARD_0_GUILD, ZAYDEN, joined()).await.unwrap();
@@ -326,7 +299,7 @@ async fn a_gateway_reconnect_is_a_reconnect(pool: PgPool) {
 #[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn re_adding_after_being_removed_is_a_rejoin(pool: PgPool) {
     GuildPresence::joined(&pool, SHARD_0_GUILD, ZAYDEN, joined()).await.unwrap();
-    mark_seeded(&pool, SHARD_0_GUILD).await;
+    mark_seeded(&pool, SHARD_0_GUILD, ZAYDEN).await;
     GuildPresence::left(&pool, SHARD_0_GUILD, ZAYDEN).await.unwrap();
 
     let kind =

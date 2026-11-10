@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM guild_app_modules\n                 WHERE guild_id = $1 AND application_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a4676566bce953cf0734a1db46a3ffce6b6ca632d29aa113f15c00cfb61013a9"
+}

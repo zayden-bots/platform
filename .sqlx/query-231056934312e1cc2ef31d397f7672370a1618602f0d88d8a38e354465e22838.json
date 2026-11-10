@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE guild_presence SET modules_seeded_at = now()\n         WHERE guild_id = $1 AND application_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "231056934312e1cc2ef31d397f7672370a1618602f0d88d8a38e354465e22838"
+}

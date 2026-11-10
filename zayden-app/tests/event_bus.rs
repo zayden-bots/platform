@@ -100,6 +100,23 @@ async fn next_event(rx: &mut broadcast::Receiver<AppEvent>) -> Option<AppEvent> 
     timeout(Duration::from_secs(15), rx.recv()).await.ok()?.ok()
 }
 
+#[test]
+fn a_modules_change_carries_guild_and_application() {
+    assert!(matches!(
+        Channel::ModulesChanged.decode("7:9"),
+        Some(AppEvent::ModulesChanged { guild_id: 7, application_id: 9 })
+    ));
+}
+
+#[test]
+fn a_bare_guild_id_is_not_a_modules_change() {
+    assert!(Channel::ModulesChanged.decode("7").is_none());
+    assert!(matches!(
+        Channel::ModulesChanged.decode("8:9"),
+        Some(AppEvent::ModulesChanged { guild_id: 8, application_id: 9 })
+    ));
+}
+
 #[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_dropped_connection_reconnects_and_asks_for_a_resync(pool: PgPool) {
     let (tx, mut rx) = broadcast::channel(16);

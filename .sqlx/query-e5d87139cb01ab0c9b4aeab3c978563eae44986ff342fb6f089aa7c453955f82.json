@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM application_modules\n             WHERE application_id = $1 AND module <> ALL($2::text[])",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e5d87139cb01ab0c9b4aeab3c978563eae44986ff342fb6f089aa7c453955f82"
+}

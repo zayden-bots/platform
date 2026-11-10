@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH previous AS (\n                SELECT modules_seeded_at FROM guild_presence\n                WHERE guild_id = $1 AND application_id = $2 FOR UPDATE\n            )\n            UPDATE guild_presence\n            SET modules_seeded_at = $3\n            FROM previous\n            WHERE guild_presence.guild_id = $1 AND guild_presence.application_id = $2\n              AND (previous.modules_seeded_at IS NULL\n                   OR ($4 AND previous.modules_seeded_at IS DISTINCT FROM $3))\n            RETURNING previous.modules_seeded_at AS \"previous?: jiff_sqlx::Timestamp\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "previous?: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "guild_presence",
+            "name": "modules_seeded_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Timestamptz",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "fa54183d0e8e1017b17d62dd942ceabf145d05e3b36750a639c51c3aa221457b"
+}

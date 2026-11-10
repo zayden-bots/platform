@@ -34,16 +34,18 @@ pub async fn seed(
     guild: &Guild,
     joined_at: Timestamp,
     join: JoinKind,
+    application_id: ApplicationId,
 ) -> Result<Arc<ModuleStates>> {
     let guild_id = guild.id.get().cast_signed();
+    let app_id = application_id.get().cast_signed();
 
-    let imported = if app.modules.needs_import(guild_id).await? {
+    let imported = if app.modules.needs_import(guild_id, app_id).await? {
         imported_disabled(http, registry, guild.id).await?
     } else {
         HashSet::new()
     };
 
-    Ok(app.modules.seed(guild_id, joined_at, join, &imported).await?)
+    Ok(app.modules.seed(guild_id, app_id, joined_at, join, &imported).await?)
 }
 
 async fn imported_disabled(
@@ -149,7 +151,10 @@ async fn resync(
         return Ok(());
     }
 
-    let states = app.modules.refresh(guild_id.get().cast_signed()).await?;
+    let states = app
+        .modules
+        .refresh(guild_id.get().cast_signed(), application_id.get().cast_signed())
+        .await?;
     sync_commands(http, registry, guild_id, &states).await?;
     Ok(())
 }
@@ -193,8 +198,11 @@ pub fn spawn_listener(
 
         loop {
             match rx.recv().await {
-                Ok(AppEvent::ModulesChanged(guild_id)) => {
-                    if guild_id == 0 {
+                Ok(AppEvent::ModulesChanged {
+                    guild_id,
+                    application_id: target,
+                }) => {
+                    if guild_id == 0 || target != application_id.get() {
                         continue;
                     }
 

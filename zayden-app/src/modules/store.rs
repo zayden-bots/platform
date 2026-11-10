@@ -17,7 +17,7 @@ const CACHE_TTL: Duration = Duration::from_secs(60);
 
 pub struct ModuleStore {
     db: PgPool,
-    cache: Cache<i64, Arc<ModuleStates>>,
+    cache: Cache<(i64, i64), Arc<ModuleStates>>,
 }
 
 impl ModuleStore {
@@ -31,14 +31,18 @@ impl ModuleStore {
     pub async fn states(
         &self,
         guild_id: i64,
+        application_id: i64,
     ) -> Result<Arc<ModuleStates>, sqlx::Error> {
-        if let Some(cached) = self.cache.get(&guild_id).await {
+        let key = (guild_id, application_id);
+        if let Some(cached) = self.cache.get(&key).await {
             return Ok(cached);
         }
 
         let states = sqlx::query!(
-            "SELECT module, enabled FROM guild_modules WHERE guild_id = $1",
-            guild_id
+            "SELECT module, enabled FROM guild_app_modules
+             WHERE guild_id = $1 AND application_id = $2",
+            guild_id,
+            application_id
         )
         .fetch_all(&self.db)
         .await?
@@ -47,22 +51,30 @@ impl ModuleStore {
         .collect::<ModuleStates>();
 
         let states = Arc::new(states);
-        self.cache.insert(guild_id, Arc::clone(&states)).await;
+        self.cache.insert(key, Arc::clone(&states)).await;
         Ok(states)
     }
 
     pub async fn refresh(
         &self,
         guild_id: i64,
+        application_id: i64,
     ) -> Result<Arc<ModuleStates>, sqlx::Error> {
-        self.cache.invalidate(&guild_id).await;
-        self.states(guild_id).await
+        self.cache.invalidate(&(guild_id, application_id)).await;
+        self.states(guild_id, application_id).await
     }
 
-    pub async fn needs_import(&self, guild_id: i64) -> Result<bool, sqlx::Error> {
+    pub async fn needs_import(
+        &self,
+        guild_id: i64,
+        application_id: i64,
+    ) -> Result<bool, sqlx::Error> {
         let seeded = sqlx::query_scalar!(
-            r#"SELECT bot_joined_at IS NOT NULL AS "seeded!" FROM guilds WHERE id = $1"#,
-            guild_id
+            r#"SELECT modules_seeded_at IS NOT NULL AS "seeded!"
+               FROM guild_presence
+               WHERE guild_id = $1 AND application_id = $2"#,
+            guild_id,
+            application_id
         )
         .fetch_optional(&self.db)
         .await?;
@@ -73,7 +85,8 @@ impl ModuleStore {
     pub async fn seed(
         &self,
         guild_id: i64,
-        bot_joined_at: Timestamp,
+        application_id: i64,
+        joined_at: Timestamp,
         join: JoinKind,
         imported_disabled: &HashSet<&str>,
     ) -> Result<Arc<ModuleStates>, sqlx::Error> {
@@ -93,18 +106,20 @@ impl ModuleStore {
         let joined = sqlx::query!(
             r#"
             WITH previous AS (
-                SELECT bot_joined_at FROM guilds WHERE id = $1 FOR UPDATE
+                SELECT modules_seeded_at FROM guild_presence
+                WHERE guild_id = $1 AND application_id = $2 FOR UPDATE
             )
-            UPDATE guilds
-            SET bot_joined_at = $2
+            UPDATE guild_presence
+            SET modules_seeded_at = $3
             FROM previous
-            WHERE guilds.id = $1
-              AND (previous.bot_joined_at IS NULL
-                   OR ($3 AND previous.bot_joined_at IS DISTINCT FROM $2))
-            RETURNING previous.bot_joined_at AS "previous?: jiff_sqlx::Timestamp"
+            WHERE guild_presence.guild_id = $1 AND guild_presence.application_id = $2
+              AND (previous.modules_seeded_at IS NULL
+                   OR ($4 AND previous.modules_seeded_at IS DISTINCT FROM $3))
+            RETURNING previous.modules_seeded_at AS "previous?: jiff_sqlx::Timestamp"
             "#,
             guild_id,
-            bot_joined_at.to_sqlx() as jiff_sqlx::Timestamp,
+            application_id,
+            joined_at.to_sqlx() as jiff_sqlx::Timestamp,
             join.resets_modules(),
         )
         .fetch_optional(&mut *tx)
@@ -114,23 +129,29 @@ impl ModuleStore {
         let rejoined = matches!(joined, Some(ref row) if row.previous.is_some());
 
         if rejoined {
-            sqlx::query!("DELETE FROM guild_modules WHERE guild_id = $1", guild_id)
-                .execute(&mut *tx)
-                .await?;
+            sqlx::query!(
+                "DELETE FROM guild_app_modules
+                 WHERE guild_id = $1 AND application_id = $2",
+                guild_id,
+                application_id
+            )
+            .execute(&mut *tx)
+            .await?;
         }
 
         let (modules, enabled): (Vec<String>, Vec<bool>) = command_modules()
             .map(|m| {
                 let imported_off = first_seed && imported_disabled.contains(m.id);
-                (m.id.to_owned(), m.default_enabled(bot_joined_at) && !imported_off)
+                (m.id.to_owned(), m.default_enabled(joined_at) && !imported_off)
             })
             .unzip();
 
         sqlx::query!(
-            "INSERT INTO guild_modules (guild_id, module, enabled)
-             SELECT $1, module, enabled FROM UNNEST($2::text[], $3::bool[]) AS t (module, enabled)
-             ON CONFLICT (guild_id, module) DO NOTHING",
+            "INSERT INTO guild_app_modules (guild_id, application_id, module, enabled)
+             SELECT $1, $2, module, enabled FROM UNNEST($3::text[], $4::bool[]) AS t (module, enabled)
+             ON CONFLICT (guild_id, application_id, module) DO NOTHING",
             guild_id,
+            application_id,
             &modules,
             &enabled,
         )
@@ -139,12 +160,13 @@ impl ModuleStore {
 
         tx.commit().await?;
 
-        self.refresh(guild_id).await
+        self.refresh(guild_id, application_id).await
     }
 
     pub async fn set(
         &self,
         guild_id: i64,
+        application_id: i64,
         module: &str,
         enabled: bool,
     ) -> Result<(), sqlx::Error> {
@@ -158,20 +180,25 @@ impl ModuleStore {
         .await?;
 
         sqlx::query!(
-            "INSERT INTO guild_modules (guild_id, module, enabled) VALUES ($1, $2, $3)
-             ON CONFLICT (guild_id, module) DO UPDATE SET enabled = EXCLUDED.enabled",
+            "INSERT INTO guild_app_modules (guild_id, application_id, module, enabled)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (guild_id, application_id, module)
+             DO UPDATE SET enabled = EXCLUDED.enabled",
             guild_id,
+            application_id,
             module,
             enabled,
         )
         .execute(&mut *tx)
         .await?;
 
-        Channel::ModulesChanged.notify(&mut *tx, &guild_id.to_string()).await?;
+        Channel::ModulesChanged
+            .notify(&mut *tx, &format!("{guild_id}:{application_id}"))
+            .await?;
 
         tx.commit().await?;
 
-        self.cache.invalidate(&guild_id).await;
+        self.cache.invalidate(&(guild_id, application_id)).await;
         Ok(())
     }
 }

@@ -33,6 +33,10 @@ impl ModuleSet {
         Ok(Self { modules, routes })
     }
 
+    pub fn ids(&self) -> Vec<String> {
+        self.modules.iter().map(|m| m.id().to_owned()).collect()
+    }
+
     pub fn register_all(
         &self,
         builder: &mut RegistryBuilder,

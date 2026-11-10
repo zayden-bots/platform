@@ -105,7 +105,7 @@ impl CommandRegistry {
         );
 
         if let (Some(module), Some(guild_id)) = (cmd.module(), interaction.guild_id)
-            && module_disabled(&app, guild_id, module).await
+            && module_disabled(&app, me, guild_id, module).await
         {
             reply_ephemeral(ctx, interaction, MODULE_OFF.to_string()).await;
             span.record("outcome", "disabled");
@@ -151,7 +151,7 @@ impl CommandRegistry {
         );
 
         if let (Some(module), Some(guild_id)) = (comp.module(), interaction.guild_id)
-            && module_disabled(&app, guild_id, module).await
+            && module_disabled(&app, me, guild_id, module).await
         {
             let strip = !comp.keep_when_disabled()
                 && !interaction.message.flags.is_some_and(|flags| {
@@ -234,8 +234,17 @@ impl CommandRegistry {
     }
 }
 
-async fn module_disabled(app: &AppState, guild_id: GuildId, module: &str) -> bool {
-    match app.modules.states(guild_id.get().cast_signed()).await {
+async fn module_disabled(
+    app: &AppState,
+    me: Identity,
+    guild_id: GuildId,
+    module: &str,
+) -> bool {
+    match app
+        .modules
+        .states(guild_id.get().cast_signed(), me.application_i64())
+        .await
+    {
         Ok(states) => states.get(module) == Some(&false),
         Err(e) => {
             warn!(?e, %guild_id, module, "failed to read module state; allowing command");

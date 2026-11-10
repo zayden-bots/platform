@@ -53,7 +53,13 @@ impl Channel {
     pub fn decode(self, payload: &str) -> Option<AppEvent> {
         let event = match self {
             Self::ConfigChanged => AppEvent::ConfigChanged(payload.parse().ok()?),
-            Self::ModulesChanged => AppEvent::ModulesChanged(payload.parse().ok()?),
+            Self::ModulesChanged => {
+                let (guild_id, application_id) = payload.split_once(':')?;
+                AppEvent::ModulesChanged {
+                    guild_id: guild_id.parse().ok()?,
+                    application_id: application_id.parse().ok()?,
+                }
+            },
             Self::EntitlementChanged => AppEvent::EntitlementChanged(
                 EntitlementScope::from_notify_payload(payload).ok()?,
             ),

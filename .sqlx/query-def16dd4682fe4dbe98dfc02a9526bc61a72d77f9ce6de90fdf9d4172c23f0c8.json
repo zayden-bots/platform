@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT module FROM application_modules WHERE application_id = $1\n         ORDER BY module",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "module",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "application_modules",
+            "name": "module"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "def16dd4682fe4dbe98dfc02a9526bc61a72d77f9ce6de90fdf9d4172c23f0c8"
+}

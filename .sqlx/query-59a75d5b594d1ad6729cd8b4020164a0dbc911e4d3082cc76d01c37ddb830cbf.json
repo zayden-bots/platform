@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT module, enabled FROM guild_modules WHERE guild_id = $1",
+  "query": "SELECT module, enabled FROM guild_app_modules\n             WHERE guild_id = $1 AND application_id = $2",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "guild_modules",
+            "table": "guild_app_modules",
             "name": "module"
           }
         }
@@ -20,7 +20,7 @@
         "type_info": "Bool",
         "origin": {
           "Table": {
-            "table": "guild_modules",
+            "table": "guild_app_modules",
             "name": "enabled"
           }
         }
@@ -28,6 +28,7 @@
     ],
     "parameters": {
       "Left": [
+        "Int8",
         "Int8"
       ]
     },
@@ -36,5 +37,5 @@
       false
     ]
   },
-  "hash": "874ed3a0721ff69d25471a60d4aecec830624d43ff59d77d6a03f7ce7e589699"
+  "hash": "59a75d5b594d1ad6729cd8b4020164a0dbc911e4d3082cc76d01c37ddb830cbf"
 }

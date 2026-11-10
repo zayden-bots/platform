@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO application_status\n                 (process, application_id, build_sha, started_at, last_seen)\n             VALUES ($1, $2, $3, now(), now())\n             ON CONFLICT (process) DO UPDATE\n             SET application_id = EXCLUDED.application_id,\n                 build_sha = EXCLUDED.build_sha,\n                 started_at = now(),\n                 last_seen = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9427b25190ab5ebea7daa4f4350f0fb204fa6d54eabe6b4ff44a0f542eb71891"
+}

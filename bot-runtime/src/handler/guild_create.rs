@@ -58,6 +58,7 @@ impl Handler {
             guild,
             joined_at,
             join,
+            self.me.application_id,
         )
         .await?;
 

@@ -8,7 +8,6 @@ pub const RETENTION_DAYS: i32 = 30;
 pub enum JoinKind {
     First,
     Reconnect,
-    Additional,
     Rejoin,
 }
 
@@ -16,28 +15,21 @@ pub enum JoinKind {
 pub struct OwnPresence {
     pub joined_at: Option<Timestamp>,
     pub present: bool,
+    pub seeded: bool,
 }
 
 impl JoinKind {
     #[must_use]
-    pub fn classify(
-        seeded: bool,
-        own: Option<OwnPresence>,
-        others_present: bool,
-        joined_at: Timestamp,
-    ) -> Self {
-        let same_membership = own.is_some_and(|own| {
-            own.present && own.joined_at.is_none_or(|at| at == joined_at)
-        });
-
-        if !seeded {
-            Self::First
-        } else if same_membership {
-            Self::Reconnect
-        } else if others_present {
-            Self::Additional
-        } else {
-            Self::Rejoin
+    pub fn classify(own: Option<OwnPresence>, joined_at: Timestamp) -> Self {
+        match own {
+            None => Self::First,
+            Some(own) if !own.seeded => Self::First,
+            Some(own)
+                if own.present && own.joined_at.is_none_or(|at| at == joined_at) =>
+            {
+                Self::Reconnect
+            },
+            Some(_) => Self::Rejoin,
         }
     }
 
@@ -71,18 +63,13 @@ impl GuildPresence {
         .execute(&mut *tx)
         .await?;
 
-        let seeded = sqlx::query_scalar!(
-            r#"SELECT bot_joined_at IS NOT NULL AS "seeded!" FROM guilds WHERE id = $1 FOR UPDATE"#,
-            guild_id
-        )
-        .fetch_one(&mut *tx)
-        .await?;
-
         let own = sqlx::query!(
             r#"SELECT joined_at AS "joined_at: jiff_sqlx::Timestamp",
-                      left_at IS NULL AS "present!"
+                      left_at IS NULL AS "present!",
+                      modules_seeded_at IS NOT NULL AS "seeded!"
                FROM guild_presence
-               WHERE guild_id = $1 AND application_id = $2"#,
+               WHERE guild_id = $1 AND application_id = $2
+               FOR UPDATE"#,
             guild_id,
             application_id
         )
@@ -91,18 +78,8 @@ impl GuildPresence {
         .map(|row| OwnPresence {
             joined_at: row.joined_at.map(jiff_sqlx::Timestamp::to_jiff),
             present: row.present,
+            seeded: row.seeded,
         });
-
-        let others_present = sqlx::query_scalar!(
-            r#"SELECT EXISTS (
-                   SELECT 1 FROM guild_presence
-                   WHERE guild_id = $1 AND application_id <> $2 AND left_at IS NULL
-               ) AS "present!""#,
-            guild_id,
-            application_id
-        )
-        .fetch_one(&mut *tx)
-        .await?;
 
         #[expect(
             trivial_casts,
@@ -122,7 +99,7 @@ impl GuildPresence {
 
         tx.commit().await?;
 
-        Ok(JoinKind::classify(seeded, own, others_present, joined_at))
+        Ok(JoinKind::classify(own, joined_at))
     }
 
     pub async fn left(

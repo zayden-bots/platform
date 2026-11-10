@@ -24,6 +24,7 @@ pub mod registry;
 mod serving_guard;
 pub mod sqlx_lib;
 pub mod state;
+mod status;
 pub mod webhook_logger;
 
 pub use error::{BotError, Result};
@@ -169,6 +170,8 @@ impl Boot {
         let registry =
             build_registry(&modules).map_err(|e| BotError::Other(e.to_string()))?;
         zayden_app::modules::validate(&registry.commands_by_module())?;
+        status::record_start(&app_state.db, me, &modules).await;
+        status::spawn_heartbeat(app_state.db.clone(), me);
 
         let mut builder = ClientBuilder::new(
             bot_config

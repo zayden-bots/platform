@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE application_status SET last_seen = now() WHERE process = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6363b79224ef111ac3a3d700518ea6274db448fab5da56de15291af37df725f3"
+}
