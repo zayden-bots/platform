@@ -170,8 +170,8 @@ impl Boot {
         let registry =
             build_registry(&modules).map_err(|e| BotError::Other(e.to_string()))?;
         zayden_app::modules::validate(&registry.commands_by_module())?;
-        status::record_start(&app_state.db, me, &modules).await;
-        status::spawn_heartbeat(app_state.db.clone(), me);
+        let status_modules = Arc::clone(&modules);
+        let status_db = app_state.db.clone();
 
         let mut builder = ClientBuilder::new(
             bot_config
@@ -209,6 +209,8 @@ impl Boot {
             bot_config.normal_log_webhook.as_ref().map(ExposeSecret::expose_secret),
         )
         .await;
+        status::record_start(&status_db, me, &status_modules).await;
+        status::spawn_heartbeat(status_db, me);
         install_metrics(name, SocketAddr::from(([0, 0, 0, 0], 9100)));
 
         let runners = Arc::clone(&client.shard_manager.runners);

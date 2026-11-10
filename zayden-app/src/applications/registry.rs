@@ -61,10 +61,20 @@ impl ProcessStatus {
         Ok(())
     }
 
-    pub async fn seen(pool: &PgPool, process: &str) -> sqlx::Result<()> {
+    pub async fn seen(
+        pool: &PgPool,
+        process: &str,
+        application_id: Option<i64>,
+        build_sha: &str,
+    ) -> sqlx::Result<()> {
         sqlx::query!(
-            "UPDATE application_status SET last_seen = now() WHERE process = $1",
-            process
+            "INSERT INTO application_status
+                 (process, application_id, build_sha, started_at, last_seen)
+             VALUES ($1, $2, $3, now(), now())
+             ON CONFLICT (process) DO UPDATE SET last_seen = now()",
+            process,
+            application_id,
+            build_sha
         )
         .execute(pool)
         .await?;

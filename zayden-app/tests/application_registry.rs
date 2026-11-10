@@ -64,7 +64,7 @@ async fn replace_leaves_other_applications_alone(pool: PgPool) {
 #[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn started_then_seen_moves_last_seen(pool: PgPool) {
     ProcessStatus::started(&pool, "zayden", Some(APP), "abc123").await.unwrap();
-    ProcessStatus::seen(&pool, "zayden").await.unwrap();
+    ProcessStatus::seen(&pool, "zayden", Some(APP), "abc123").await.unwrap();
 
     let row = sqlx::query!(
         r#"SELECT application_id, build_sha, (last_seen >= started_at) AS "ordered!"
@@ -81,14 +81,18 @@ async fn started_then_seen_moves_last_seen(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "schema::MIGRATOR")]
-async fn seen_for_an_unknown_process_writes_nothing(pool: PgPool) {
-    ProcessStatus::seen(&pool, "ghost").await.unwrap();
+async fn seen_recreates_a_missing_row(pool: PgPool) {
+    ProcessStatus::seen(&pool, "ghost", Some(APP), "abc123").await.unwrap();
 
-    let count = sqlx::query_scalar!(
-        r#"SELECT count(*) AS "count!" FROM application_status"#
+    let row = sqlx::query!(
+        "SELECT application_id, build_sha FROM application_status
+         WHERE process = $1",
+        "ghost"
     )
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(count, 0);
+
+    assert_eq!(row.application_id, Some(APP));
+    assert_eq!(row.build_sha, "abc123");
 }

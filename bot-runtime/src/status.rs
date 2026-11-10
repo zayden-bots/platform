@@ -35,7 +35,14 @@ pub(crate) fn spawn_heartbeat(pool: PgPool, me: Identity) {
 
         loop {
             interval.tick().await;
-            if let Err(e) = ProcessStatus::seen(&pool, &process).await {
+            if let Err(e) = ProcessStatus::seen(
+                &pool,
+                &process,
+                Some(me.application_i64()),
+                &build_sha(),
+            )
+            .await
+            {
                 warn!(error = ?e, "failed to record the process heartbeat");
             }
         }
