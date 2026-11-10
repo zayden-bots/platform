@@ -143,12 +143,10 @@ redundant_pub_crate = "allow"
 [workspace.dependencies]
 
 # -- Workspace members
-bot-runtime = { path = "./bot-runtime" }
 zayden-app = { path = "./zayden-app" }
 zayden-core = { path = "./zayden-core" }
-zayden-graphics = { path = "./zayden-graphics" }
 
-# -- Org repositories (one tag per repository)
+# -- Org repositories (one ref per repository)
 schema = { git = "https://github.com/zayden-bots/schema" }
 
 # -- Discord
