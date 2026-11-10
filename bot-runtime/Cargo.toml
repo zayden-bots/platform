@@ -16,6 +16,7 @@ workspace = true
 [dependencies]
 zayden-core = { workspace = true }
 zayden-app = { workspace = true }
+schema = { workspace = true }
 
 async-trait = { workspace = true }
 dotenvy = { workspace = true }

@@ -35,7 +35,6 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry, filter, fmt};
 use zayden_app::config::BotConfig;
 use zayden_app::events::listener::EventListener;
-use zayden_app::migrations;
 use zayden_app::state::AppState;
 use zayden_app::telemetry::{LogFormat, install_metrics};
 use zayden_core::{ModuleCtx, RuntimeState};
@@ -90,7 +89,7 @@ pub async fn boot(name: &'static str) -> Result<Boot> {
 
     let pool = new_pool_with_retry().await?;
 
-    migrations::migrator()
+    schema::migrator()
         .run(&pool)
         .await
         .map_err(|e| BotError::Other(format!("failed to run migrations: {e}")))?;

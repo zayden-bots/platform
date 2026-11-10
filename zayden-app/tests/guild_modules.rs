@@ -87,7 +87,7 @@ fn validate_rejects_a_command_module_without_commands() {
     ));
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn first_seed_applies_module_defaults(pool: PgPool) -> sqlx::Result<()> {
     let states = ModuleStore::new(pool)
         .seed(GUILD, joined(), JoinKind::First, &HashSet::new())
@@ -101,7 +101,7 @@ async fn first_seed_applies_module_defaults(pool: PgPool) -> sqlx::Result<()> {
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn first_seed_applies_imported_overrides(pool: PgPool) -> sqlx::Result<()> {
     let states = ModuleStore::new(pool)
         .seed(GUILD, joined(), JoinKind::First, &HashSet::from(["music"]))
@@ -113,7 +113,7 @@ async fn first_seed_applies_imported_overrides(pool: PgPool) -> sqlx::Result<()>
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn guild_needs_import_until_seeded(pool: PgPool) -> sqlx::Result<()> {
     let store = ModuleStore::new(pool);
 
@@ -124,7 +124,7 @@ async fn guild_needs_import_until_seeded(pool: PgPool) -> sqlx::Result<()> {
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn reseed_keeps_toggles(pool: PgPool) -> sqlx::Result<()> {
     let store = ModuleStore::new(pool);
 
@@ -138,7 +138,7 @@ async fn reseed_keeps_toggles(pool: PgPool) -> sqlx::Result<()> {
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn reseed_ignores_imported_overrides(pool: PgPool) -> sqlx::Result<()> {
     let store = ModuleStore::new(pool);
 
@@ -152,7 +152,7 @@ async fn reseed_ignores_imported_overrides(pool: PgPool) -> sqlx::Result<()> {
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn reinvite_resets_toggles(pool: PgPool) -> sqlx::Result<()> {
     let store = ModuleStore::new(pool);
 
@@ -169,7 +169,7 @@ async fn reinvite_resets_toggles(pool: PgPool) -> sqlx::Result<()> {
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn set_is_visible_through_the_cache(pool: PgPool) -> sqlx::Result<()> {
     let store = ModuleStore::new(pool);
 
@@ -183,7 +183,7 @@ async fn set_is_visible_through_the_cache(pool: PgPool) -> sqlx::Result<()> {
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_second_bot_joining_keeps_toggles(pool: PgPool) -> sqlx::Result<()> {
     let store = ModuleStore::new(pool);
 
@@ -199,7 +199,7 @@ async fn a_second_bot_joining_keeps_toggles(pool: PgPool) -> sqlx::Result<()> {
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_reconnect_with_a_new_join_time_keeps_toggles(
     pool: PgPool,
 ) -> sqlx::Result<()> {

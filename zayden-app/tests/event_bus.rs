@@ -17,7 +17,7 @@ fn channel_names_round_trip() {
     assert_eq!(Channel::from_name("not_a_channel"), None);
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn every_settings_table_notifies_config_changes(pool: PgPool) {
     let silent = sqlx::query_scalar!(
         r#"SELECT c.relname AS "relname!"
@@ -50,7 +50,7 @@ async fn every_settings_table_notifies_config_changes(pool: PgPool) {
     );
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn every_channel_the_database_raises_is_one_the_listener_hears(pool: PgPool) {
     let sources = sqlx::query_scalar!(
         r#"SELECT p.prosrc AS "prosrc!"
@@ -100,7 +100,7 @@ async fn next_event(rx: &mut broadcast::Receiver<AppEvent>) -> Option<AppEvent> 
     timeout(Duration::from_secs(15), rx.recv()).await.ok()?.ok()
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_dropped_connection_reconnects_and_asks_for_a_resync(pool: PgPool) {
     let (tx, mut rx) = broadcast::channel(16);
     EventListener::spawn(pool.clone(), tx);

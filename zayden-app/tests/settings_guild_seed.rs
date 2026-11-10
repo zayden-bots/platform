@@ -45,7 +45,7 @@ fn store<Row: SettingsRow>(pool: &PgPool) -> SettingsStore<Row> {
 /// The finding's exact scenario: a guild with no `guilds` row — the state of
 /// every fresh install until someone speaks. Fails before the fix with
 /// `23503 … violates foreign key constraint "honeypot_settings_guild_id_fkey"`.
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn update_seeds_the_guilds_row_for_an_unseen_guild(
     pool: PgPool,
 ) -> sqlx::Result<()> {
@@ -69,7 +69,7 @@ async fn update_seeds_the_guilds_row_for_an_unseen_guild(
 /// unrelated row type going through the same `update` is what proves the
 /// placement, and it is the assertion that would fail if someone "fixed" this by
 /// putting an `INSERT INTO guilds` back into a single command or server fn.
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn the_seed_belongs_to_the_store_not_the_row(
     pool: PgPool,
 ) -> sqlx::Result<()> {
@@ -87,7 +87,7 @@ async fn the_seed_belongs_to_the_store_not_the_row(
 /// replaced the row would silently destroy every settings row for that guild —
 /// a far worse bug than the one being fixed. Two stores and three writes against
 /// one guild would trip any of those wrong shapes.
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn repeated_seeds_never_disturb_existing_rows(
     pool: PgPool,
 ) -> sqlx::Result<()> {
@@ -113,7 +113,7 @@ async fn repeated_seeds_never_disturb_existing_rows(
 
 /// The already-seeded guild — the common case once anyone has chatted. The
 /// redundant seed must be a no-op rather than an error.
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn an_already_seeded_guild_still_updates(pool: PgPool) -> sqlx::Result<()> {
     sqlx::query!(
         "INSERT INTO guilds (id) VALUES ($1) ON CONFLICT (id) DO NOTHING",

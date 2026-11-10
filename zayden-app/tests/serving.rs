@@ -107,26 +107,26 @@ async fn serving_llama(pool: &PgPool) {
     join(pool, GUILD, LLAMA).await;
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_guild_without_a_custom_bot_is_served_by_zayden(pool: PgPool) {
     join(&pool, GUILD, ZAYDEN.cast_signed()).await;
 
     assert_eq!(serving(&pool, GUILD).await, zayden(true));
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn zayden_is_reported_absent_when_it_is_not_in_the_guild(pool: PgPool) {
     assert_eq!(serving(&pool, GUILD).await, zayden(false));
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_present_entitled_custom_bot_serves(pool: PgPool) {
     serving_llama(&pool).await;
 
     assert_eq!(serving(&pool, GUILD).await, llama());
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_custom_bot_not_yet_invited_leaves_zayden_serving(pool: PgPool) {
     register(&pool, &[GUILD]).await;
     grant(&pool, "guild", GUILD, "ultra", None).await;
@@ -135,7 +135,7 @@ async fn a_custom_bot_not_yet_invited_leaves_zayden_serving(pool: PgPool) {
     assert_eq!(serving(&pool, GUILD).await, zayden(true));
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn the_custom_bot_wins_when_both_are_present(pool: PgPool) {
     join(&pool, GUILD, ZAYDEN.cast_signed()).await;
     serving_llama(&pool).await;
@@ -143,7 +143,7 @@ async fn the_custom_bot_wins_when_both_are_present(pool: PgPool) {
     assert_eq!(serving(&pool, GUILD).await, llama());
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_kicked_custom_bot_hands_back_to_zayden(pool: PgPool) {
     serving_llama(&pool).await;
     GuildPresence::left(&pool, GUILD, LLAMA).await.unwrap();
@@ -151,7 +151,7 @@ async fn a_kicked_custom_bot_hands_back_to_zayden(pool: PgPool) {
     assert_eq!(serving(&pool, GUILD).await, zayden(false));
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_revoked_custom_bot_hands_back_to_zayden(pool: PgPool) {
     serving_llama(&pool).await;
     CustomBotStore::set_status(&pool, LLAMA, CustomBotStatus::Revoked)
@@ -161,7 +161,7 @@ async fn a_revoked_custom_bot_hands_back_to_zayden(pool: PgPool) {
     assert_eq!(serving(&pool, GUILD).await, zayden(false));
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_lapsed_entitlement_keeps_serving_during_the_grace_window(pool: PgPool) {
     register(&pool, &[GUILD]).await;
     grant(&pool, "guild", GUILD, "ultra", Some(2)).await;
@@ -170,7 +170,7 @@ async fn a_lapsed_entitlement_keeps_serving_during_the_grace_window(pool: PgPool
     assert_eq!(serving(&pool, GUILD).await, llama());
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_lapsed_entitlement_past_the_grace_window_hands_back_to_zayden(
     pool: PgPool,
 ) {
@@ -181,7 +181,7 @@ async fn a_lapsed_entitlement_past_the_grace_window_hands_back_to_zayden(
     assert_eq!(serving(&pool, GUILD).await, zayden(false));
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_user_scope_ultra_does_not_qualify(pool: PgPool) {
     register(&pool, &[GUILD]).await;
     grant(&pool, "user", ADMIN, "ultra", None).await;
@@ -190,7 +190,7 @@ async fn a_user_scope_ultra_does_not_qualify(pool: PgPool) {
     assert_eq!(serving(&pool, GUILD).await, zayden(false));
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_guild_pro_entitlement_does_not_qualify(pool: PgPool) {
     register(&pool, &[GUILD]).await;
     grant(&pool, "guild", GUILD, "pro", None).await;
@@ -199,7 +199,7 @@ async fn a_guild_pro_entitlement_does_not_qualify(pool: PgPool) {
     assert_eq!(serving(&pool, GUILD).await, zayden(false));
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn each_guild_of_a_shared_bot_is_gated_by_its_own_entitlement(pool: PgPool) {
     register(&pool, &[GUILD, SECOND_GUILD]).await;
     grant(&pool, "guild", GUILD, "ultra", None).await;
@@ -210,7 +210,7 @@ async fn each_guild_of_a_shared_bot_is_gated_by_its_own_entitlement(pool: PgPool
     assert_eq!(serving(&pool, SECOND_GUILD).await, zayden(false));
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_detached_guild_hands_back_to_zayden(pool: PgPool) {
     serving_llama(&pool).await;
     CustomBotStore::detach(&pool, GUILD).await.unwrap();
@@ -218,7 +218,7 @@ async fn a_detached_guild_hands_back_to_zayden(pool: PgPool) {
     assert_eq!(serving(&pool, GUILD).await, zayden(false));
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn the_llama_guilds_are_entitled_by_migration(pool: PgPool) {
     for guild in [1_133_034_263_579_734_037_i64, 935_189_797_528_555_610] {
         let entitled = sqlx::query_scalar!(

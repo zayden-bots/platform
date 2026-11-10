@@ -36,7 +36,7 @@ async fn register(pool: &PgPool, application_id: i64) {
     CustomBotStore::upsert(pool, &bot, &sealed).await.unwrap();
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_stored_token_round_trips(pool: PgPool) {
     register(&pool, LLAMA).await;
 
@@ -46,7 +46,7 @@ async fn a_stored_token_round_trips(pool: PgPool) {
     assert_eq!(keys.open(LLAMA, &sealed).unwrap().expose_secret(), TOKEN);
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn one_bot_can_serve_several_guilds(pool: PgPool) {
     register(&pool, LLAMA).await;
 
@@ -59,7 +59,7 @@ async fn one_bot_can_serve_several_guilds(pool: PgPool) {
     ]);
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn attaching_the_same_bot_twice_is_idempotent(pool: PgPool) {
     register(&pool, LLAMA).await;
 
@@ -69,7 +69,7 @@ async fn attaching_the_same_bot_twice_is_idempotent(pool: PgPool) {
     assert_eq!(CustomBotStore::guilds(&pool, LLAMA).await.unwrap(), [GUILD]);
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_guild_takes_only_one_custom_bot(pool: PgPool) {
     register(&pool, LLAMA).await;
     register(&pool, OTHER).await;
@@ -87,7 +87,7 @@ async fn a_guild_takes_only_one_custom_bot(pool: PgPool) {
     );
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn purging_a_guild_detaches_its_bot(pool: PgPool) {
     register(&pool, LLAMA).await;
     CustomBotStore::attach(&pool, GUILD, LLAMA, ADMIN).await.unwrap();
@@ -103,7 +103,7 @@ async fn purging_a_guild_detaches_its_bot(pool: PgPool) {
     );
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn detaching_reports_whether_anything_was_attached(pool: PgPool) {
     register(&pool, LLAMA).await;
     CustomBotStore::attach(&pool, GUILD, LLAMA, ADMIN).await.unwrap();
@@ -112,7 +112,7 @@ async fn detaching_reports_whether_anything_was_attached(pool: PgPool) {
     assert!(!CustomBotStore::detach(&pool, GUILD).await.unwrap());
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn change_notifications_carry_ids_and_never_the_token(pool: PgPool) {
     register(&pool, LLAMA).await;
     CustomBotStore::attach(&pool, GUILD, LLAMA, ADMIN).await.unwrap();

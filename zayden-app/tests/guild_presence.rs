@@ -84,7 +84,7 @@ async fn left_at_is_set(pool: &PgPool, guild_id: i64, application_id: i64) -> bo
     .expect("the presence lookup runs")
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_guild_inside_the_window_is_kept(pool: PgPool) {
     GuildPresence::joined(&pool, SHARD_0_GUILD, ZAYDEN, joined()).await.unwrap();
     GuildPresence::left(&pool, SHARD_0_GUILD, ZAYDEN).await.unwrap();
@@ -99,7 +99,7 @@ async fn a_guild_inside_the_window_is_kept(pool: PgPool) {
     );
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_guild_past_the_window_is_purged_with_its_data(pool: PgPool) {
     GuildPresence::joined(&pool, SHARD_0_GUILD, ZAYDEN, joined()).await.unwrap();
     sqlx::query!("INSERT INTO music_settings (guild_id) VALUES ($1)", SHARD_0_GUILD)
@@ -133,7 +133,7 @@ async fn a_guild_past_the_window_is_purged_with_its_data(pool: PgPool) {
     assert_eq!(leftovers, 0);
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn re_adding_the_bot_cancels_the_purge(pool: PgPool) {
     GuildPresence::joined(&pool, SHARD_0_GUILD, ZAYDEN, joined()).await.unwrap();
     GuildPresence::left(&pool, SHARD_0_GUILD, ZAYDEN).await.unwrap();
@@ -151,7 +151,7 @@ async fn re_adding_the_bot_cancels_the_purge(pool: PgPool) {
     assert!(guild_exists(&pool, SHARD_0_GUILD).await);
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_sibling_bot_still_present_keeps_the_guild(pool: PgPool) {
     GuildPresence::joined(&pool, SHARD_0_GUILD, ZAYDEN, joined()).await.unwrap();
     GuildPresence::joined(&pool, SHARD_0_GUILD, VIKTOR, joined()).await.unwrap();
@@ -164,7 +164,7 @@ async fn a_sibling_bot_still_present_keeps_the_guild(pool: PgPool) {
     );
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_repeated_removal_keeps_the_first_departure_time(pool: PgPool) {
     GuildPresence::joined(&pool, SHARD_0_GUILD, ZAYDEN, joined()).await.unwrap();
     GuildPresence::left(&pool, SHARD_0_GUILD, ZAYDEN).await.unwrap();
@@ -177,7 +177,7 @@ async fn a_repeated_removal_keeps_the_first_departure_time(pool: PgPool) {
     ]);
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn leaving_a_guild_with_no_data_records_nothing(pool: PgPool) {
     GuildPresence::left(&pool, SHARD_0_GUILD, ZAYDEN).await.unwrap();
 
@@ -186,7 +186,7 @@ async fn leaving_a_guild_with_no_data_records_nothing(pool: PgPool) {
 
 /// Ready only lists the guilds of its own shard, so guilds on other shards
 /// must not be mistaken for removals.
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn reconcile_marks_only_missing_guilds_on_its_own_shard(pool: PgPool) {
     let listed = SHARD_0_GUILD + 2;
     for guild_id in [SHARD_0_GUILD, listed, SHARD_1_GUILD] {
@@ -208,7 +208,7 @@ async fn reconcile_marks_only_missing_guilds_on_its_own_shard(pool: PgPool) {
 
 /// A guild stored before presence tracking existed, and never seen by this bot
 /// since, still enters the window instead of being kept forever.
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn reconcile_covers_guilds_stored_before_tracking(pool: PgPool) {
     sqlx::query!("INSERT INTO guilds (id) VALUES ($1)", SHARD_0_GUILD)
         .execute(&pool)
@@ -285,7 +285,7 @@ fn only_a_rejoin_resets_modules() {
     assert!(!JoinKind::Additional.resets_modules());
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_second_bot_joining_is_additional(pool: PgPool) {
     GuildPresence::joined(&pool, SHARD_0_GUILD, ZAYDEN, joined()).await.unwrap();
     mark_seeded(&pool, SHARD_0_GUILD).await;
@@ -296,7 +296,7 @@ async fn a_second_bot_joining_is_additional(pool: PgPool) {
     assert_eq!(kind, JoinKind::Additional);
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_bot_absent_since_reconcile_joining_beside_another_is_additional(
     pool: PgPool,
 ) {
@@ -312,7 +312,7 @@ async fn a_bot_absent_since_reconcile_joining_beside_another_is_additional(
     assert_eq!(kind, JoinKind::Additional);
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn a_gateway_reconnect_is_a_reconnect(pool: PgPool) {
     GuildPresence::joined(&pool, SHARD_0_GUILD, ZAYDEN, joined()).await.unwrap();
     mark_seeded(&pool, SHARD_0_GUILD).await;
@@ -323,7 +323,7 @@ async fn a_gateway_reconnect_is_a_reconnect(pool: PgPool) {
     assert_eq!(kind, JoinKind::Reconnect);
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn re_adding_after_being_removed_is_a_rejoin(pool: PgPool) {
     GuildPresence::joined(&pool, SHARD_0_GUILD, ZAYDEN, joined()).await.unwrap();
     mark_seeded(&pool, SHARD_0_GUILD).await;
