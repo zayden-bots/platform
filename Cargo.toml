@@ -155,7 +155,7 @@ serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next", d
     "transport_compression_zlib",
     "transport_compression_zstd",
 ] }
-songbird = { git = "https://github.com/KiloOscarSix/songbird", branch = "ringbuf-bump", default-features = false }
+songbird = { git = "https://github.com/serenity-rs/songbird", branch = "serenity-next", default-features = false }
 
 # -- Errors
 thiserror = { version = "*", default-features = false }
