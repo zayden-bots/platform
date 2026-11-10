@@ -1,12 +1,14 @@
-//! Temporary: adopts the plaintext custom bot tokens in `bot_tokens` into
-//! encrypted `custom_bots`. Delete this module together with the `bot_tokens`
-//! table once every legacy row has been adopted.
-
 use secrecy::{ExposeSecret, SecretString};
 use serenity::all::{Http, Token};
 use sqlx::PgPool;
 use tracing::{info, warn};
-use zayden_app::custom_bots::{CustomBotStore, Keyring, NewCustomBot};
+use zayden_app::applications::{
+    ApplicationStore,
+    Keyring,
+    NewApplication,
+    NewCustomApplication,
+    Slot,
+};
 use zayden_core::as_i64;
 
 use crate::Result;
@@ -65,16 +67,23 @@ async fn adopt(
 
     let application_id = as_i64(application.id.get());
     let avatar = user.avatar.map(|hash| hash.to_string());
-    let bot = NewCustomBot {
-        application_id,
-        bot_user_id: as_i64(user.id.get()),
-        name: &user.name,
-        avatar: avatar.as_deref(),
+    let bot = NewCustomApplication {
+        app: NewApplication {
+            application_id,
+            slot: Slot::Zayden,
+            bot_user_id: as_i64(user.id.get()),
+            name: &user.name,
+            avatar: avatar.as_deref(),
+        },
         public_key: &application.verify_key,
         registered_by,
     };
-    CustomBotStore::upsert(pool, &bot, &keyring.seal(application_id, token)?)
-        .await?;
+    ApplicationStore::upsert_custom(
+        pool,
+        &bot,
+        &keyring.seal(application_id, token)?,
+    )
+    .await?;
 
     let guilds = sqlx::query_scalar!(
         "SELECT guild_id FROM guild_presence
@@ -85,7 +94,7 @@ async fn adopt(
     .await?;
 
     for &guild_id in &guilds {
-        CustomBotStore::attach(pool, guild_id, application_id, registered_by)
+        ApplicationStore::attach(pool, guild_id, application_id, registered_by)
             .await?;
     }
 

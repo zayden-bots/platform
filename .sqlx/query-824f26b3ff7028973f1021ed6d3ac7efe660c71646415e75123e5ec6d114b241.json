@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO applications\n                 (application_id, slot, kind, bot_user_id, name, avatar)\n             VALUES ($1, $2, 'default', $3, $4, $5)\n             ON CONFLICT (application_id) DO UPDATE SET\n                 bot_user_id = EXCLUDED.bot_user_id,\n                 name = EXCLUDED.name,\n                 avatar = EXCLUDED.avatar\n             WHERE applications.kind = 'default'\n               AND applications.slot = EXCLUDED.slot",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Int8",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "824f26b3ff7028973f1021ed6d3ac7efe660c71646415e75123e5ec6d114b241"
+}

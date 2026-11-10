@@ -3,7 +3,7 @@ use std::sync::Arc;
 use serenity::all::{Context, ModalInteraction};
 use tracing::{info, warn};
 use zayden_app::state::AppState;
-use zayden_core::parse_modal_components;
+use zayden_core::{Identity, parse_modal_components};
 
 use super::respond_with_error;
 use crate::{CommandRegistry, Handler, Result};
@@ -14,6 +14,7 @@ impl Handler {
         interaction: &ModalInteraction,
         app: Arc<AppState>,
         registry: Arc<CommandRegistry>,
+        me: Identity,
     ) -> Result<()> {
         let inputs = parse_modal_components(interaction.data.components.as_slice());
 
@@ -22,7 +23,7 @@ impl Handler {
             interaction.user.name, interaction.data.custom_id, inputs
         );
 
-        match registry.run_modal(ctx, interaction, app).await {
+        match registry.run_modal(ctx, interaction, app, me).await {
             Some(Ok(())) => {},
             Some(Err(e)) => respond_with_error(ctx, interaction, e).await,
             None => warn!(

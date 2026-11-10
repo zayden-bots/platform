@@ -1,5 +1,5 @@
 use secrecy::{ExposeSecret, SecretString};
-use zayden_app::custom_bots::{CustomBotError, Keyring};
+use zayden_app::applications::{ApplicationError, Keyring};
 
 const KEY_1: &str = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=";
 const KEY_2: &str = "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=";
@@ -44,7 +44,7 @@ fn a_token_moved_to_another_application_fails_to_open() {
 
     assert!(matches!(
         keys.open(APPLICATION + 1, &sealed),
-        Err(CustomBotError::Decrypt(_))
+        Err(ApplicationError::Decrypt(_))
     ));
 }
 
@@ -59,7 +59,7 @@ fn a_tampered_ciphertext_fails_to_open() {
 
     assert!(matches!(
         keys.open(APPLICATION, &sealed),
-        Err(CustomBotError::Decrypt(_))
+        Err(ApplicationError::Decrypt(_))
     ));
 }
 
@@ -85,7 +85,7 @@ fn a_token_sealed_under_an_unloaded_key_is_refused() {
 
     assert!(matches!(
         only_first.open(APPLICATION, &sealed),
-        Err(CustomBotError::UnknownKey(2))
+        Err(ApplicationError::UnknownKey(2))
     ));
 }
 
@@ -100,7 +100,7 @@ fn a_different_key_under_the_same_id_fails_to_open() {
 
     assert!(matches!(
         swapped.open(APPLICATION, &sealed),
-        Err(CustomBotError::Decrypt(_))
+        Err(ApplicationError::Decrypt(_))
     ));
 }
 
@@ -108,7 +108,7 @@ fn a_different_key_under_the_same_id_fails_to_open() {
 fn an_active_key_that_is_not_loaded_is_rejected() {
     assert!(matches!(
         Keyring::parse(&format!("1:{KEY_1}"), "3"),
-        Err(CustomBotError::UnknownKey(3))
+        Err(ApplicationError::UnknownKey(3))
     ));
 }
 
@@ -116,7 +116,7 @@ fn an_active_key_that_is_not_loaded_is_rejected() {
 fn a_short_key_is_rejected() {
     assert!(matches!(
         Keyring::parse("1:AQID", "1"),
-        Err(CustomBotError::KeyLength { id: 1, .. })
+        Err(ApplicationError::KeyLength { id: 1, .. })
     ));
 }
 
@@ -124,7 +124,7 @@ fn a_short_key_is_rejected() {
 fn a_duplicated_key_id_is_rejected() {
     assert!(matches!(
         Keyring::parse(&format!("1:{KEY_1},1:{KEY_2}"), "1"),
-        Err(CustomBotError::InvalidKeySpec(_))
+        Err(ApplicationError::InvalidKeySpec(_))
     ));
 }
 

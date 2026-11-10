@@ -5,8 +5,10 @@ use std::string::FromUtf8Error;
 use aws_lc_rs::error::Unspecified;
 use thiserror::Error;
 
+use super::Slot;
+
 #[derive(Debug, Error)]
-pub enum CustomBotError {
+pub enum ApplicationError {
     #[error("{name} is not set")]
     MissingEnvVar {
         name: &'static str,
@@ -53,8 +55,27 @@ pub enum CustomBotError {
     #[error("the decrypted bot token is not UTF-8")]
     NotUtf8(#[from] FromUtf8Error),
 
-    #[error("guild {guild_id} is already served by custom bot {application_id}")]
-    GuildTaken { guild_id: i64, application_id: i64 },
+    #[error("unknown slot `{0}`")]
+    UnknownSlot(String),
+
+    #[error("the {} slot already has a default application", .0.name())]
+    SlotTaken(Slot),
+
+    #[error("application {0} is not a default application")]
+    NotDefault(i64),
+
+    #[error("application {0} is not a custom application")]
+    NotCustom(i64),
+
+    #[error("application {0} is not a registered custom application")]
+    UnknownApplication(i64),
+
+    #[error(
+        "guild {guild_id} is already served in the {} slot by custom bot \
+         {application_id}",
+        slot.name()
+    )]
+    GuildTaken { guild_id: i64, slot: Slot, application_id: i64 },
 
     #[error(transparent)]
     Sqlx(#[from] sqlx::Error),

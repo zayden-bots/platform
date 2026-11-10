@@ -1,17 +1,12 @@
-use serenity::all::{Context, Ready};
+use serenity::all::Context;
 use sqlx::PgPool;
 use tokio::sync::RwLock;
-use zayden_core::{EmojiCache, RuntimeState};
+use zayden_core::{EmojiCache, Identity, RuntimeState};
 
 use crate::{Result, ZAYDEN_TOKEN, zayden_token};
 
-pub async fn load_emojis(
-    ctx: &Context,
-    ready: &Ready,
-    pool: &PgPool,
-    zayden_id: u64,
-) -> Result<()> {
-    let cache = if ready.application.id.get() == zayden_id {
+pub async fn load_emojis(ctx: &Context, pool: &PgPool, me: Identity) -> Result<()> {
+    let cache = if me.is_primary() {
         EmojiCache::new(ctx).await?
     } else {
         let token = ZAYDEN_TOKEN.get_or_try_init(|| zayden_token(pool)).await?;

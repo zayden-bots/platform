@@ -3,7 +3,7 @@ use std::sync::Arc;
 use serenity::all::{CommandInteraction, Context};
 use tracing::{info, warn};
 use zayden_app::state::AppState;
-use zayden_core::get_option_str;
+use zayden_core::{Identity, get_option_str};
 
 use super::respond_with_error;
 use crate::CommandRegistry;
@@ -15,6 +15,7 @@ impl Handler {
         interaction: &CommandInteraction,
         app: Arc<AppState>,
         registry: Arc<CommandRegistry>,
+        me: Identity,
     ) {
         let options = interaction.data.options();
 
@@ -25,7 +26,7 @@ impl Handler {
             get_option_str(&options)
         );
 
-        match registry.run_command(ctx, interaction, app).await {
+        match registry.run_command(ctx, interaction, app, me).await {
             Some(Ok(())) => {},
             Some(Err(e)) => respond_with_error(ctx, interaction, e).await,
             None => {

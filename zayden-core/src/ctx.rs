@@ -13,9 +13,12 @@ use serenity::all::{
 use zayden_app::config::BotConfig;
 use zayden_app::state::AppState;
 
+use crate::Identity;
+
 pub struct ModuleCtx<'a> {
     pub app: &'a Arc<AppState>,
     pub config: &'a BotConfig,
+    pub me: Identity,
 }
 
 pub struct StartCtx<'a> {
@@ -23,23 +26,27 @@ pub struct StartCtx<'a> {
     pub app: Arc<AppState>,
     pub ready: &'a Ready,
     pub primary: bool,
+    pub me: Identity,
 }
 
 pub struct InvocationCtx<'a> {
     pub ctx: &'a Context,
     pub interaction: &'a CommandInteraction,
     pub app: Arc<AppState>,
+    pub me: Identity,
 }
 
 pub struct EventCtx<'a> {
     pub ctx: &'a Context,
     pub app: Arc<AppState>,
+    pub me: Identity,
 }
 
 pub struct ComponentCtx<'a> {
     pub ctx: &'a Context,
     pub interaction: &'a ComponentInteraction,
     pub app: Arc<AppState>,
+    pub me: Identity,
 }
 
 impl ComponentCtx<'_> {
@@ -64,10 +71,12 @@ pub struct ModalCtx<'a> {
     pub ctx: &'a Context,
     pub interaction: &'a ModalInteraction,
     pub app: Arc<AppState>,
+    pub me: Identity,
 }
 
 pub struct AutocompleteCtx<'a> {
     pub ctx: &'a Context,
     pub interaction: &'a CommandInteraction,
     pub app: Arc<AppState>,
+    pub me: Identity,
 }

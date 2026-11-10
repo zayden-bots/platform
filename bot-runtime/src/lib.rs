@@ -21,6 +21,7 @@ mod metrics_layer;
 pub mod module_sync;
 mod modules;
 pub mod registry;
+mod serving_guard;
 pub mod sqlx_lib;
 pub mod state;
 pub mod webhook_logger;
@@ -33,11 +34,12 @@ use tracing::warn;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry, filter, fmt};
+use zayden_app::applications::{AppKind, ApplicationStore, NewApplication, Slot};
 use zayden_app::config::BotConfig;
 use zayden_app::events::listener::EventListener;
 use zayden_app::state::AppState;
 use zayden_app::telemetry::{LogFormat, install_metrics};
-use zayden_core::{ModuleCtx, RuntimeState};
+use zayden_core::{Identity, ModuleCtx, RuntimeState, as_i64};
 
 use crate::modules::ModuleSet;
 use crate::sqlx_lib::new_pool_with_retry;
@@ -76,10 +78,11 @@ pub fn build_registry(
 pub struct Boot {
     pub app: Arc<AppState>,
     pub config: BotConfig,
+    pub me: Identity,
     name: &'static str,
 }
 
-pub async fn boot(name: &'static str) -> Result<Boot> {
+pub async fn boot(name: &'static str, slot: Slot) -> Result<Boot> {
     if rustls::crypto::aws_lc_rs::default_provider().install_default().is_err() {
         warn!("Rustls CryptoProvider was already installed");
     }
@@ -98,19 +101,57 @@ pub async fn boot(name: &'static str) -> Result<Boot> {
     let bot_config = BotConfig::load(&pool).await?;
     info!("BotConfig loaded successfully");
 
+    let http = Http::new(
+        bot_config
+            .discord_token
+            .expose_secret()
+            .parse::<Token>()
+            .map_err(serenity::Error::Token)?,
+    );
+    let (user, application) = tokio::try_join!(
+        http.get_current_user(),
+        http.get_current_application_info(),
+    )?;
+
+    let default_id = bot_config.default_application_id(slot).ok_or_else(|| {
+        BotError::Other(format!(
+            "no default application id configured for slot {}",
+            slot.as_str()
+        ))
+    })?;
+    let kind = if application.id.get() == default_id {
+        AppKind::Default
+    } else {
+        AppKind::Custom
+    };
+    let me =
+        Identity { application_id: application.id, user_id: user.id, slot, kind };
+
+    if kind == AppKind::Default {
+        let avatar = user.avatar.map(|hash| hash.to_string());
+        ApplicationStore::register_default(&pool, &NewApplication {
+            application_id: me.application_i64(),
+            slot,
+            bot_user_id: as_i64(user.id.get()),
+            name: &user.name,
+            avatar: avatar.as_deref(),
+        })
+        .await?;
+    }
+
     let app_state = Arc::new(AppState::new(pool.clone(), &bot_config));
     info!("AppState constructed successfully");
 
     EventListener::spawn(pool.clone(), app_state.events.clone());
     legacy_bot_tokens::spawn(pool.clone(), bot_config.bot_owner);
 
-    Ok(Boot { app: app_state, config: bot_config, name })
+    Ok(Boot { app: app_state, config: bot_config, me, name })
 }
 
 impl Boot {
     #[must_use]
     pub const fn module_ctx(&self) -> ModuleCtx<'_> {
-        ModuleCtx { app: &self.app, config: &self.config }
+        ModuleCtx { app: &self.app, config: &self.config, me: self.me }
     }
 
     pub async fn run(
@@ -118,7 +159,7 @@ impl Boot {
         assembly: Assembly,
         voice_manager: Option<Arc<Songbird>>,
     ) -> Result<()> {
-        let Self { app: app_state, config: bot_config, name } = self;
+        let Self { app: app_state, config: bot_config, me, name } = self;
 
         let bot_state_inner = RuntimeState::new();
         let primary_jobs = cron::collect_jobs(assembly.primary_jobs);
@@ -155,6 +196,7 @@ impl Boot {
                 registry,
                 cron_started: OnceLock::new(),
                 primary_jobs,
+                me,
             }))
             .await?;
 

@@ -23,7 +23,7 @@ pub enum BotError {
     ZaydenCore(CoreError),
 
     Config(zayden_app::AppError),
-    CustomBot(zayden_app::custom_bots::CustomBotError),
+    Application(zayden_app::applications::ApplicationError),
     Jiff(jiff::Error),
     Modules(ModuleErrors),
     Other(String),
@@ -35,7 +35,7 @@ impl std::fmt::Display for BotError {
             Self::ZaydenCore(e) => e.fmt(f),
 
             Self::Config(e) => e.fmt(f),
-            Self::CustomBot(e) => e.fmt(f),
+            Self::Application(e) => e.fmt(f),
             Self::Jiff(e) => e.fmt(f),
             Self::Modules(e) => e.fmt(f),
             Self::Other(msg) => write!(f, "{msg}"),
@@ -47,7 +47,7 @@ impl std::error::Error for BotError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Config(e) => Some(e),
-            Self::CustomBot(e) => Some(e),
+            Self::Application(e) => Some(e),
             Self::ZaydenCore(e) => Some(e),
             Self::Jiff(e) => Some(e),
             Self::Modules(_) | Self::Other(_) => None,
@@ -61,7 +61,7 @@ impl Respond for BotError {
             Self::ZaydenCore(e) => e.user_message(),
 
             Self::Config(_)
-            | Self::CustomBot(_)
+            | Self::Application(_)
             | Self::Jiff(_)
             | Self::Modules(_)
             | Self::Other(_) => None,
@@ -93,9 +93,9 @@ impl From<zayden_app::AppError> for BotError {
     }
 }
 
-impl From<zayden_app::custom_bots::CustomBotError> for BotError {
-    fn from(e: zayden_app::custom_bots::CustomBotError) -> Self {
-        Self::CustomBot(e)
+impl From<zayden_app::applications::ApplicationError> for BotError {
+    fn from(e: zayden_app::applications::ApplicationError) -> Self {
+        Self::Application(e)
     }
 }
 

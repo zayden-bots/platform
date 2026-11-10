@@ -1,5 +1,5 @@
+pub mod applications;
 pub mod config;
-pub mod custom_bots;
 pub mod entitlement;
 pub mod error;
 pub mod events;

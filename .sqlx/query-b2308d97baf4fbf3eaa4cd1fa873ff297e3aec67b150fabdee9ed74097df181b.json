@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO application_guilds\n                 (guild_id, slot, application_id, attached_by)\n             SELECT $1, a.slot, a.application_id, $3 FROM applications a\n             WHERE a.application_id = $2 AND a.kind = 'custom'\n             ON CONFLICT (guild_id, slot) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b2308d97baf4fbf3eaa4cd1fa873ff297e3aec67b150fabdee9ed74097df181b"
+}

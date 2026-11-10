@@ -1,16 +1,16 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT application_id FROM custom_bot_guilds WHERE guild_id = $1",
+  "query": "SELECT guild_id FROM application_guilds\n             WHERE application_id = $1 ORDER BY guild_id",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "application_id",
+        "name": "guild_id",
         "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "custom_bot_guilds",
-            "name": "application_id"
+            "table": "application_guilds",
+            "name": "guild_id"
           }
         }
       }
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "d13a642d71f2df8071d84bd0c84d5e556eee229b0a68fbf1a0761409718f16ab"
+  "hash": "6bf12c06c3feb55febbc1f36085326a4b05617e4e5cdca1addc5d00524a8b37a"
 }

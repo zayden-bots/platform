@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT g.application_id, g.slot\n             FROM application_guilds g\n             JOIN applications a ON a.slot = g.slot\n             WHERE g.guild_id = $1 AND a.application_id = $2\n               AND a.kind = 'custom'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "application_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "application_guilds",
+            "name": "application_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "slot",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "application_guilds",
+            "name": "slot"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "3a6713e6611f17e6a2098c15dac5ec9f56027283ff628bfa8dfa244d715ba1cb"
+}

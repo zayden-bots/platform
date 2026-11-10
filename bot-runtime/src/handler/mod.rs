@@ -10,7 +10,7 @@ use tracing::{debug, error, trace, warn};
 use zayden_app::state::AppState;
 use zayden_core::ctx::EventCtx;
 use zayden_core::module::Screen;
-use zayden_core::{CronJob, RuntimeState};
+use zayden_core::{CronJob, Identity, RuntimeState};
 
 mod entitlement;
 mod guild_create;
@@ -29,6 +29,7 @@ pub struct Handler {
     pub registry: Arc<CommandRegistry>,
     pub cron_started: OnceLock<()>,
     pub primary_jobs: Vec<CronJob>,
+    pub me: Identity,
 }
 
 #[async_trait]
@@ -139,7 +140,7 @@ impl EventHandler for Handler {
 
         let pool = self.app.db.clone();
 
-        let cx = EventCtx { ctx, app: Arc::clone(&self.app) };
+        let cx = EventCtx { ctx, app: Arc::clone(&self.app), me: self.me };
 
         if let FullEvent::Message { new_message, .. } = ev
             && !new_message.author.bot()
@@ -154,7 +155,7 @@ impl EventHandler for Handler {
                 Self::guild_create(self, ctx, guild, &pool).await
             },
             FullEvent::GuildDelete { incomplete, .. } => {
-                Self::guild_delete(ctx, incomplete, &pool).await
+                Self::guild_delete(self, incomplete, &pool).await
             },
             FullEvent::GuildUpdate { new_data, .. } => {
                 Self::guild_update(new_data, &pool).await
@@ -166,7 +167,8 @@ impl EventHandler for Handler {
             FullEvent::InteractionCreate { interaction, .. } => {
                 let app = Arc::clone(&self.app);
                 let registry = Arc::clone(&self.registry);
-                Self::interaction_create(ctx, interaction, app, registry).await
+                Self::interaction_create(ctx, interaction, app, registry, self.me)
+                    .await
             },
 
             FullEvent::EntitlementCreate { entitlement, .. } => {

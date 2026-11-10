@@ -8,6 +8,7 @@ use serde::Deserialize;
 use sqlx::PgPool;
 use tracing::warn;
 
+use crate::applications::Slot;
 use crate::config::radio;
 use crate::config::radio::RadioStation;
 use crate::{Error, Result};
@@ -123,6 +124,9 @@ pub struct BotConfig {
     pub llamad2_guild: u64,
     /// Discord user/application ID of the Zayden bot itself.
     pub zayden_id: u64,
+    pub maria_id: Option<u64>,
+
+    pub auto_leave: bool,
 
     pub error_log_webhook: Option<SecretString>,
     pub normal_log_webhook: Option<SecretString>,
@@ -243,6 +247,9 @@ impl BotConfig {
                 .llamad2_guild
                 .unwrap_or(DEFAULT_LLAMAD2_GUILD),
             zayden_id: toml_cfg.ids.zayden_id.unwrap_or(DEFAULT_ZAYDEN_ID),
+            maria_id: toml_cfg.ids.maria_id,
+
+            auto_leave: toml_cfg.serving.auto_leave.unwrap_or(false),
 
             error_log_webhook: db
                 .as_ref()
@@ -312,6 +319,14 @@ impl BotConfig {
 
             radio_stations: radio::validate_all(radio::load()?),
         })
+    }
+
+    #[must_use]
+    pub const fn default_application_id(&self, slot: Slot) -> Option<u64> {
+        match slot {
+            Slot::Zayden => Some(self.zayden_id),
+            Slot::Maria => self.maria_id,
+        }
     }
 }
 
@@ -608,6 +623,8 @@ struct TomlConfig {
     #[serde(default)]
     ids: TomlIds,
     #[serde(default)]
+    serving: TomlServing,
+    #[serde(default)]
     dashboard: TomlDashboard,
     #[serde(default)]
     palworld: TomlPalworld,
@@ -700,6 +717,12 @@ struct TomlIds {
     zayden_guild: Option<u64>,
     llamad2_guild: Option<u64>,
     zayden_id: Option<u64>,
+    maria_id: Option<u64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct TomlServing {
+    auto_leave: Option<bool>,
 }
 
 #[derive(Debug, Default, Deserialize)]

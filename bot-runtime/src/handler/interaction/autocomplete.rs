@@ -3,6 +3,7 @@ use std::sync::Arc;
 use serenity::all::{CommandInteraction, Context};
 use tracing::{error, warn};
 use zayden_app::state::AppState;
+use zayden_core::Identity;
 
 use crate::handler::Handler;
 use crate::{CommandRegistry, Result};
@@ -13,8 +14,9 @@ impl Handler {
         interaction: &CommandInteraction,
         app: Arc<AppState>,
         registry: Arc<CommandRegistry>,
+        me: Identity,
     ) -> Result<()> {
-        match registry.run_autocomplete(ctx, interaction, app).await {
+        match registry.run_autocomplete(ctx, interaction, app, me).await {
             Some(Ok(())) => {},
             Some(Err(err)) => {
                 error!(

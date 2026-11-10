@@ -13,6 +13,7 @@ use serenity::all::{
 };
 use tracing::{error, warn};
 use zayden_app::state::AppState;
+use zayden_core::Identity;
 use zayden_core::error::HandlerError;
 
 mod autocomplete;
@@ -170,6 +171,7 @@ impl Handler {
         interaction: &Interaction,
         app: Arc<AppState>,
         registry: Arc<CommandRegistry>,
+        me: Identity,
     ) -> Result<()> {
         match interaction {
             Interaction::Command(command) => {
@@ -178,6 +180,7 @@ impl Handler {
                     command,
                     Arc::clone(&app),
                     Arc::clone(&registry),
+                    me,
                 )
                 .await;
                 Ok(())
@@ -188,6 +191,7 @@ impl Handler {
                     autocomplete,
                     Arc::clone(&app),
                     Arc::clone(&registry),
+                    me,
                 )
                 .await
             },
@@ -197,6 +201,7 @@ impl Handler {
                     component,
                     Arc::clone(&app),
                     Arc::clone(&registry),
+                    me,
                 )
                 .await
             },
@@ -206,6 +211,7 @@ impl Handler {
                     modal,
                     Arc::clone(&app),
                     Arc::clone(&registry),
+                    me,
                 )
                 .await
             },

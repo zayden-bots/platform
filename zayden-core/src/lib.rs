@@ -88,6 +88,9 @@ pub use ctx::{
     StartCtx,
 };
 
+pub mod identity;
+pub use identity::Identity;
+
 pub mod module;
 pub use module::{
     EventKind,

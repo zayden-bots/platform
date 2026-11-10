@@ -6,7 +6,7 @@ use zayden_app::guilds::{GuildOwner, GuildPresence, JoinKind};
 use zayden_core::{RuntimeState, as_i64};
 
 use super::Handler;
-use crate::{Result, module_sync};
+use crate::{Result, module_sync, serving_guard};
 
 impl Handler {
     pub async fn guild_create(
@@ -17,23 +17,27 @@ impl Handler {
     ) -> Result<()> {
         let joined_at = *guild.joined_at;
 
-        let join = match ctx.http.application_id() {
-            Some(application_id) => GuildPresence::joined(
-                pool,
-                as_i64(guild.id.get()),
-                as_i64(application_id.get()),
-                joined_at,
-            )
-            .await
-            .unwrap_or_else(|e| {
-                warn!(error = ?e, guild_id = %guild.id, "failed to record guild presence");
-                JoinKind::Reconnect
-            }),
-            None => {
-                warn!(guild_id = %guild.id, "guild seen before the application id");
-                JoinKind::Reconnect
-            },
-        };
+        let join = GuildPresence::joined(
+            pool,
+            as_i64(guild.id.get()),
+            self.me.application_i64(),
+            joined_at,
+        )
+        .await
+        .unwrap_or_else(|e| {
+            warn!(error = ?e, guild_id = %guild.id, "failed to record guild presence");
+            JoinKind::Reconnect
+        });
+
+        match serving_guard::enforce(&ctx.http, &self.app, self.me, guild.id).await {
+            Ok(true) => return Ok(()),
+            Ok(false) => {},
+            Err(e) => warn!(
+                error = ?e,
+                guild_id = %guild.id,
+                "failed to check which application serves this guild"
+            ),
+        }
 
         if let Err(e) = GuildOwner::record(
             pool,

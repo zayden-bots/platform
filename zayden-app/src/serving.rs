@@ -7,13 +7,14 @@ use tokio::sync::broadcast::Receiver;
 use tokio::sync::broadcast::error::RecvError;
 use tracing::warn;
 
+use crate::applications::Slot;
 use crate::events::AppEvent;
 
 const CACHE_TTL: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServingKind {
-    Zayden,
+    Default,
     Custom,
 }
 
@@ -26,46 +27,66 @@ pub struct ServingBot {
 
 pub struct ServingResolver {
     db: PgPool,
-    zayden_id: u64,
-    cache: Cache<i64, ServingBot>,
+    cache: Cache<(i64, Slot), Option<ServingBot>>,
 }
 
 impl ServingResolver {
     #[must_use]
-    pub fn new(db: PgPool, zayden_id: u64) -> Self {
+    pub fn new(db: PgPool) -> Self {
         let cache =
             Cache::builder().max_capacity(4_096).time_to_live(CACHE_TTL).build();
-        Self { db, zayden_id, cache }
+        Self { db, cache }
     }
 
-    pub async fn resolve(&self, guild_id: i64) -> sqlx::Result<ServingBot> {
-        if let Some(cached) = self.cache.get(&guild_id).await {
+    pub async fn resolve(
+        &self,
+        guild_id: i64,
+        slot: Slot,
+    ) -> sqlx::Result<Option<ServingBot>> {
+        if let Some(cached) = self.cache.get(&(guild_id, slot)).await {
             return Ok(cached);
         }
 
+        self.fetch(guild_id, slot).await
+    }
+
+    pub async fn fetch(
+        &self,
+        guild_id: i64,
+        slot: Slot,
+    ) -> sqlx::Result<Option<ServingBot>> {
         let row = sqlx::query!(
-            r#"WITH s AS (SELECT serving_application($1) AS custom)
-               SELECT s.custom,
+            r#"WITH s AS (
+                   SELECT custom_application($1, $2) AS custom,
+                          (SELECT application_id FROM applications
+                           WHERE slot = $2 AND kind = 'default') AS fallback
+               )
+               SELECT s.custom, s.fallback,
                       EXISTS (
                           SELECT 1 FROM guild_presence p
                           WHERE p.guild_id = $1
-                            AND p.application_id = COALESCE(s.custom, $2)
+                            AND p.application_id = COALESCE(s.custom, s.fallback)
                             AND p.left_at IS NULL
                       ) AS "present!"
                FROM s"#,
             guild_id,
-            self.zayden_id.cast_signed(),
+            slot.as_str(),
         )
         .fetch_one(&self.db)
         .await?;
 
-        let (application_id, kind) =
-            row.custom.map_or((self.zayden_id, ServingKind::Zayden), |custom| {
-                (custom.cast_unsigned(), ServingKind::Custom)
-            });
-        let bot = ServingBot { application_id, kind, present: row.present };
+        let bot = match (row.custom, row.fallback) {
+            (Some(custom), _) => Some((custom, ServingKind::Custom)),
+            (None, Some(fallback)) => Some((fallback, ServingKind::Default)),
+            (None, None) => None,
+        }
+        .map(|(application_id, kind)| ServingBot {
+            application_id: application_id.cast_unsigned(),
+            kind,
+            present: row.present,
+        });
 
-        self.cache.insert(guild_id, bot).await;
+        self.cache.insert((guild_id, slot), bot).await;
         Ok(bot)
     }
 
@@ -78,7 +99,11 @@ impl ServingResolver {
                 let Some(this) = weak.upgrade() else { break };
                 match event {
                     Ok(AppEvent::ServingChanged(guild_id)) => {
-                        this.cache.invalidate(&guild_id.cast_signed()).await;
+                        for slot in Slot::ALL {
+                            this.cache
+                                .invalidate(&(guild_id.cast_signed(), slot))
+                                .await;
+                        }
                     },
                     Ok(AppEvent::CustomBotsChanged(_) | AppEvent::Resync) => {
                         this.cache.invalidate_all();

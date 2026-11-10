@@ -9,7 +9,7 @@ use zayden_core::{StartCtx, as_i64};
 use crate::cron::{EntitlementSweepCron, collect_jobs, start_cron_jobs};
 use crate::handler::Handler;
 use crate::state::load_emojis;
-use crate::{Result, module_sync};
+use crate::{Result, module_sync, serving_guard};
 
 impl Handler {
     pub async fn ready(&self, ctx: &Context, ready: &Ready) -> Result<()> {
@@ -23,8 +23,8 @@ impl Handler {
         ctx.set_presence(None, OnlineStatus::Online);
 
         let pool = self.app.db.clone();
-        load_emojis(ctx, ready, &pool, self.app.zayden_id).await?;
-        Self::reconcile_presence(ready, &pool).await;
+        load_emojis(ctx, &pool, self.me).await?;
+        self.reconcile_presence(ready, &pool).await;
 
         if self.cron_started.set(()).is_ok() {
             self.background_tasks(ctx, ready).await;
@@ -33,7 +33,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn reconcile_presence(ready: &Ready, pool: &sqlx::PgPool) {
+    async fn reconcile_presence(&self, ready: &Ready, pool: &sqlx::PgPool) {
         let shard = ready.shard.map_or(Shard { id: 0, total: 1 }, |info| Shard {
             id: info.id.0,
             total: info.total.get(),
@@ -46,7 +46,7 @@ impl Handler {
 
         match GuildPresence::reconcile(
             pool,
-            as_i64(ready.application.id.get()),
+            self.me.application_i64(),
             shard,
             &present,
         )
@@ -61,7 +61,7 @@ impl Handler {
     }
 
     async fn background_tasks(&self, ctx: &Context, ready: &Ready) {
-        let primary = ready.application.id.get() == self.app.zayden_id;
+        let primary = self.me.is_primary();
 
         if primary {
             {
@@ -81,13 +81,19 @@ impl Handler {
             app: Arc::clone(&self.app),
             ready,
             primary,
+            me: self.me,
         });
 
         module_sync::spawn_listener(
             Arc::clone(&ctx.http),
             Arc::clone(&self.app),
             Arc::clone(&self.registry),
-            ready.application.id,
+            self.me.application_id,
+        );
+        serving_guard::spawn_listener(
+            Arc::clone(&ctx.http),
+            Arc::clone(&self.app),
+            self.me,
         );
 
         let ctx = ctx.clone();

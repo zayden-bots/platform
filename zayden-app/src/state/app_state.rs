@@ -44,6 +44,7 @@ pub struct AppState {
     /// Discord user/application ID of the bot itself.
     pub zayden_id: u64,
     pub zayden_guild: u64,
+    pub auto_leave: bool,
     pub upgrade_url: Option<String>,
 
     pub sku_tiers: HashMap<u64, Tier>,
@@ -63,7 +64,7 @@ impl AppState {
 
         let modules = Arc::new(ModuleStore::new(pool.clone()));
 
-        let serving = Arc::new(ServingResolver::new(pool.clone(), config.zayden_id));
+        let serving = Arc::new(ServingResolver::new(pool.clone()));
         ServingResolver::spawn_invalidator(&serving, events.subscribe());
 
         let mut sku_tiers = HashMap::new();
@@ -105,6 +106,7 @@ impl AppState {
                 .unwrap_or_else(|| SecretString::from(String::new())),
             zayden_id: config.zayden_id,
             zayden_guild: config.zayden_guild,
+            auto_leave: config.auto_leave,
             upgrade_url: config.upgrade_url.clone(),
             sku_tiers,
             radio_stations: Arc::clone(&config.radio_stations),

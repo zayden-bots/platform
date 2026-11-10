@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE custom_bots SET status = $2 WHERE application_id = $1",
+  "query": "UPDATE applications SET status = $2 WHERE application_id = $1",
   "describe": {
     "columns": [],
     "parameters": {
@@ -11,5 +11,5 @@
     },
     "nullable": []
   },
-  "hash": "f7400425efb8fc3b8fa017892fac113116c8e49ccf3f7c23493538d87b6ef6f9"
+  "hash": "d89ed455d30bba433217eb39527970a04dba3842d599c573a87285a1350e0980"
 }

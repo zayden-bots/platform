@@ -19,7 +19,6 @@ use tracing::{Instrument, info_span, warn};
 use zayden_app::entitlement::{EntitlementScope, Tier};
 use zayden_app::modules::ModuleStates;
 use zayden_app::state::AppState;
-use zayden_core::DispatchMap;
 pub use zayden_core::OverlapError;
 use zayden_core::ctx::{AutocompleteCtx, ComponentCtx, InvocationCtx, ModalCtx};
 use zayden_core::error::HandlerError;
@@ -31,6 +30,7 @@ use zayden_core::module::{
 };
 pub use zayden_core::registry::RegistryBuilder;
 use zayden_core::scope::CommandScope;
+use zayden_core::{DispatchMap, Identity};
 
 const MODULE_OFF: &str = "This module is turned off for this server.";
 
@@ -94,6 +94,7 @@ impl CommandRegistry {
         ctx: &Context,
         interaction: &CommandInteraction,
         app: Arc<AppState>,
+        me: Identity,
     ) -> Option<Result<(), HandlerError>> {
         let cmd = Arc::clone(self.commands.get(interaction.data.name.as_str())?);
         let span = info_span!(
@@ -129,7 +130,7 @@ impl CommandRegistry {
             }
         }
 
-        let cx = InvocationCtx { ctx, interaction, app };
+        let cx = InvocationCtx { ctx, interaction, app, me };
         let result = cmd.run(&cx).instrument(span.clone()).await;
         span.record("outcome", outcome(&result));
         Some(result)
@@ -140,6 +141,7 @@ impl CommandRegistry {
         ctx: &Context,
         interaction: &ComponentInteraction,
         app: Arc<AppState>,
+        me: Identity,
     ) -> Option<Result<(), HandlerError>> {
         let comp = Arc::clone(self.components.lookup(&interaction.data.custom_id)?);
         let span = info_span!(
@@ -200,7 +202,7 @@ impl CommandRegistry {
             }
         }
 
-        let cx = ComponentCtx { ctx, interaction, app };
+        let cx = ComponentCtx { ctx, interaction, app, me };
         let result = comp.run(&cx).instrument(span.clone()).await;
         span.record("outcome", outcome(&result));
         Some(result)
@@ -211,9 +213,10 @@ impl CommandRegistry {
         ctx: &Context,
         interaction: &ModalInteraction,
         app: Arc<AppState>,
+        me: Identity,
     ) -> Option<Result<(), HandlerError>> {
         let modal = Arc::clone(self.modals.lookup(&interaction.data.custom_id)?);
-        let cx = ModalCtx { ctx, interaction, app };
+        let cx = ModalCtx { ctx, interaction, app, me };
         Some(modal.run(&cx).await)
     }
 
@@ -222,10 +225,11 @@ impl CommandRegistry {
         ctx: &Context,
         interaction: &CommandInteraction,
         app: Arc<AppState>,
+        me: Identity,
     ) -> Option<Result<(), HandlerError>> {
         let auto =
             Arc::clone(self.autocompletes.get(interaction.data.name.as_str())?);
-        let cx = AutocompleteCtx { ctx, interaction, app };
+        let cx = AutocompleteCtx { ctx, interaction, app, me };
         Some(auto.run(&cx).await)
     }
 }
