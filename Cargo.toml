@@ -149,7 +149,7 @@ zayden-core = { path = "./zayden-core" }
 zayden-graphics = { path = "./zayden-graphics" }
 
 # -- Org repositories (one tag per repository)
-schema = { git = "https://github.com/ViridianLink/schema", tag = "v1.0.0" }
+schema = { git = "https://github.com/zayden-bots/schema" }
 
 # -- Discord
 serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next", default-features = false, features = [
