@@ -23,7 +23,7 @@ impl Handler {
         ctx.set_presence(None, OnlineStatus::Online);
 
         let pool = self.app.db.clone();
-        load_emojis(ctx, &pool, self.me).await?;
+        load_emojis(ctx, &self.app, self.me).await?;
         self.reconcile_presence(ready, &pool).await;
 
         if self.cron_started.set(()).is_ok() {

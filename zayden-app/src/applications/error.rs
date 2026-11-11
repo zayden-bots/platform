@@ -55,6 +55,12 @@ pub enum ApplicationError {
     #[error("the decrypted bot token is not UTF-8")]
     NotUtf8(#[from] FromUtf8Error),
 
+    #[error("no custom bot keyring is loaded")]
+    NoKeyring,
+
+    #[error("application {0} has no stored token")]
+    NoToken(i64),
+
     #[error("unknown slot `{0}`")]
     UnknownSlot(String),
 

@@ -12,6 +12,7 @@ use zayden_app::applications::{
 };
 
 const KEY: &str = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=";
+const SECOND_KEY: &str = "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=";
 const ZAYDEN: i64 = 100;
 const OTHER_DEFAULT: i64 = 101;
 const LLAMA: i64 = 200;
@@ -222,6 +223,107 @@ async fn a_custom_upsert_cannot_overwrite_a_default_application(pool: PgPool) {
     let refused = ApplicationStore::upsert_custom(&pool, &app, &sealed).await;
 
     assert!(matches!(refused, Err(ApplicationError::NotCustom(ZAYDEN))));
+}
+
+#[sqlx::test(migrator = "schema::MIGRATOR")]
+async fn a_default_application_publishes_its_token_once(pool: PgPool) {
+    ApplicationStore::register_default(&pool, &default_app(ZAYDEN, "Zayden"))
+        .await
+        .unwrap();
+    let keys = Keyring::parse(&format!("1:{KEY}"), "1").unwrap();
+    let token = SecretString::from(TOKEN.to_owned());
+
+    assert!(
+        ApplicationStore::publish_default_token(&pool, &keys, ZAYDEN, &token)
+            .await
+            .unwrap()
+    );
+    assert!(
+        !ApplicationStore::publish_default_token(&pool, &keys, ZAYDEN, &token)
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        ApplicationStore::open_token(&pool, &keys, ZAYDEN)
+            .await
+            .unwrap()
+            .expose_secret(),
+        TOKEN
+    );
+}
+
+#[sqlx::test(migrator = "schema::MIGRATOR")]
+async fn a_changed_token_is_published_again(pool: PgPool) {
+    ApplicationStore::register_default(&pool, &default_app(ZAYDEN, "Zayden"))
+        .await
+        .unwrap();
+    let keys = Keyring::parse(&format!("1:{KEY}"), "1").unwrap();
+    let token = SecretString::from(TOKEN.to_owned());
+    let changed = SecretString::from("another.fake.token".to_owned());
+
+    ApplicationStore::publish_default_token(&pool, &keys, ZAYDEN, &token)
+        .await
+        .unwrap();
+
+    assert!(
+        ApplicationStore::publish_default_token(&pool, &keys, ZAYDEN, &changed)
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        ApplicationStore::open_token(&pool, &keys, ZAYDEN)
+            .await
+            .unwrap()
+            .expose_secret(),
+        "another.fake.token"
+    );
+}
+
+#[sqlx::test(migrator = "schema::MIGRATOR")]
+async fn a_key_rotation_reseals_the_token(pool: PgPool) {
+    ApplicationStore::register_default(&pool, &default_app(ZAYDEN, "Zayden"))
+        .await
+        .unwrap();
+    let token = SecretString::from(TOKEN.to_owned());
+    let first = Keyring::parse(&format!("1:{KEY}"), "1").unwrap();
+    let rotated = Keyring::parse(&format!("1:{KEY},2:{SECOND_KEY}"), "2").unwrap();
+
+    ApplicationStore::publish_default_token(&pool, &first, ZAYDEN, &token)
+        .await
+        .unwrap();
+
+    assert!(
+        ApplicationStore::publish_default_token(&pool, &rotated, ZAYDEN, &token)
+            .await
+            .unwrap()
+    );
+    let sealed =
+        ApplicationStore::sealed_token(&pool, ZAYDEN).await.unwrap().unwrap();
+    assert_eq!(sealed.key_id, 2);
+}
+
+#[sqlx::test(migrator = "schema::MIGRATOR")]
+async fn a_custom_application_refuses_a_default_token_write(pool: PgPool) {
+    register(&pool, LLAMA).await;
+    let keys = Keyring::parse(&format!("1:{KEY}"), "1").unwrap();
+    let token = SecretString::from("another.fake.token".to_owned());
+
+    let refused =
+        ApplicationStore::publish_default_token(&pool, &keys, LLAMA, &token).await;
+
+    assert!(matches!(refused, Err(ApplicationError::NotDefault(LLAMA))));
+}
+
+#[sqlx::test(migrator = "schema::MIGRATOR")]
+async fn opening_a_default_without_a_token_is_no_token(pool: PgPool) {
+    ApplicationStore::register_default(&pool, &default_app(ZAYDEN, "Zayden"))
+        .await
+        .unwrap();
+    let keys = Keyring::parse(&format!("1:{KEY}"), "1").unwrap();
+
+    let refused = ApplicationStore::open_token(&pool, &keys, ZAYDEN).await;
+
+    assert!(matches!(refused, Err(ApplicationError::NoToken(ZAYDEN))));
 }
 
 #[sqlx::test(migrator = "schema::MIGRATOR")]

@@ -1,6 +1,7 @@
+use secrecy::{ExposeSecret, SecretString};
 use sqlx::PgPool;
 
-use super::{ApplicationError, SealedToken, Slot};
+use super::{ApplicationError, Keyring, SealedToken, Slot};
 
 const DEFAULT_SLOT_INDEX: &str = "applications_default_slot_idx";
 
@@ -227,6 +228,55 @@ impl ApplicationStore {
         });
 
         Ok(sealed)
+    }
+
+    pub async fn open_token(
+        pool: &PgPool,
+        keyring: &Keyring,
+        application_id: i64,
+    ) -> Result<SecretString, ApplicationError> {
+        let sealed = Self::sealed_token(pool, application_id)
+            .await?
+            .ok_or(ApplicationError::NoToken(application_id))?;
+
+        keyring.open(application_id, &sealed)
+    }
+
+    pub async fn publish_default_token(
+        pool: &PgPool,
+        keyring: &Keyring,
+        application_id: i64,
+        token: &SecretString,
+    ) -> Result<bool, ApplicationError> {
+        if let Some(sealed) = Self::sealed_token(pool, application_id).await?
+            && sealed.key_id == keyring.active_key_id()
+            && let Ok(stored) = keyring.open(application_id, &sealed)
+            && stored.expose_secret() == token.expose_secret()
+        {
+            return Ok(false);
+        }
+
+        let sealed = keyring.seal(application_id, token)?;
+
+        let written = sqlx::query!(
+            "UPDATE applications
+             SET key_id = $2, token_nonce = $3, token_ct = $4,
+                 token_rotated_at = now()
+             WHERE application_id = $1 AND kind = 'default'",
+            application_id,
+            sealed.key_id,
+            sealed.nonce,
+            sealed.ciphertext,
+        )
+        .execute(pool)
+        .await?
+        .rows_affected();
+
+        if written == 0 {
+            return Err(ApplicationError::NotDefault(application_id));
+        }
+
+        Ok(true)
     }
 
     pub async fn bot_user_id(

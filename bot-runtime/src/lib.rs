@@ -9,18 +9,17 @@ use std::time::Duration;
 use secrecy::ExposeSecret;
 use serenity::all::{ClientBuilder, GatewayIntents, Http, Token};
 use songbird::Songbird;
-use sqlx::PgPool;
-use tokio::sync::{OnceCell, RwLock};
+use tokio::sync::RwLock;
 use tracing::info;
 
 pub mod cron;
 mod delivery;
 mod error;
 mod handler;
-mod legacy_bot_tokens;
 mod metrics_layer;
 pub mod module_sync;
 mod modules;
+mod parent_token;
 pub mod registry;
 mod serving_guard;
 pub mod sqlx_lib;
@@ -33,6 +32,7 @@ pub mod worker;
 pub use error::{BotError, Result};
 pub use handler::Handler;
 pub use modules::{Assembly, ModuleList};
+pub use parent_token::parent_token;
 pub use registry::{CommandRegistry, OverlapError, RegistryBuilder};
 use tracing::warn;
 use tracing_subscriber::layer::SubscriberExt;
@@ -48,20 +48,6 @@ use zayden_core::{Identity, ModuleCtx, RuntimeState, as_i64};
 use crate::modules::ModuleSet;
 use crate::sqlx_lib::new_pool_with_retry;
 use crate::webhook_logger::WebhookLogger;
-
-pub static ZAYDEN_TOKEN: OnceCell<String> = OnceCell::const_new();
-
-async fn zayden_token(pool: &PgPool) -> sqlx::Result<String> {
-    sqlx::query_scalar!("SELECT token FROM bot_tokens WHERE name = 'zayden'")
-        .fetch_one(pool)
-        .await
-}
-
-// BUG: A guild with custom bots will likely have unintended behaviour with this
-// current implimentation
-pub async fn parent_token(pool: &PgPool) -> sqlx::Result<String> {
-    ZAYDEN_TOKEN.get_or_try_init(|| zayden_token(pool)).await.cloned()
-}
 
 pub fn build_registry(
     modules: &ModuleSet,
@@ -147,7 +133,6 @@ pub async fn boot(name: &'static str, slot: Slot) -> Result<Boot> {
     info!("AppState constructed successfully");
 
     EventListener::spawn(pool.clone(), app_state.events.clone());
-    legacy_bot_tokens::spawn(pool.clone(), bot_config.bot_owner);
 
     Ok(Boot { app: app_state, config: bot_config, me, name })
 }
@@ -212,6 +197,7 @@ impl Boot {
             bot_config.normal_log_webhook.as_ref().map(ExposeSecret::expose_secret),
         )
         .await;
+        parent_token::publish(&app_state, me).await;
         status::record_start(&status_db, me, &status_modules).await;
         status::spawn_heartbeat(status_db, me);
         install_metrics(name, SocketAddr::from(([0, 0, 0, 0], 9100)));
