@@ -169,6 +169,7 @@ pub fn command_modules() -> impl Iterator<Item = &'static ModuleDef> {
 }
 
 pub fn validate(
+    linked: &[&str],
     commands_by_module: &BTreeMap<&str, Vec<Cow<'_, str>>>,
 ) -> Result<(), AppError> {
     for (module, commands) in commands_by_module {
@@ -180,8 +181,8 @@ pub fn validate(
         }
     }
 
-    if let Some(module) =
-        command_modules().find(|m| !commands_by_module.contains_key(m.id))
+    if let Some(module) = command_modules()
+        .find(|m| linked.contains(&m.id) && !commands_by_module.contains_key(m.id))
     {
         return Err(AppError::ModuleWithoutCommands(module.id));
     }

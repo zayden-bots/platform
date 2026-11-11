@@ -7,6 +7,7 @@ use zayden_app::AppError;
 use zayden_app::guilds::{GuildPresence, JoinKind};
 use zayden_app::modules::{
     Backing,
+    MODULES,
     ModuleDef,
     ModuleStore,
     command_modules,
@@ -35,6 +36,10 @@ fn tagged_catalogue() -> BTreeMap<&'static str, Vec<Cow<'static, str>>> {
     command_modules().map(|m| (m.id, vec![Cow::Borrowed(m.id)])).collect()
 }
 
+fn full_catalogue() -> Vec<&'static str> {
+    MODULES.iter().map(|m| m.id).collect()
+}
+
 #[test]
 fn baseline_module_is_enabled_for_every_guild() {
     assert!(module(None).default_enabled(joined()));
@@ -59,7 +64,7 @@ fn module_introduced_as_the_bot_joined_is_enabled() {
 
 #[test]
 fn validate_accepts_tags_matching_the_catalogue() {
-    assert!(validate(&tagged_catalogue()).is_ok());
+    assert!(validate(&full_catalogue(), &tagged_catalogue()).is_ok());
 }
 
 #[test]
@@ -67,7 +72,10 @@ fn validate_rejects_an_unknown_tag() {
     let mut tags = tagged_catalogue();
     tags.insert("nonexistent", vec![Cow::Borrowed("cmd")]);
 
-    assert!(matches!(validate(&tags), Err(AppError::UnknownModule { .. })));
+    assert!(matches!(
+        validate(&full_catalogue(), &tags),
+        Err(AppError::UnknownModule { .. })
+    ));
 }
 
 #[test]
@@ -75,7 +83,10 @@ fn validate_rejects_a_tag_on_a_settings_module() {
     let mut tags = tagged_catalogue();
     tags.insert("ai", vec![Cow::Borrowed("cmd")]);
 
-    assert!(matches!(validate(&tags), Err(AppError::UnknownModule { .. })));
+    assert!(matches!(
+        validate(&full_catalogue(), &tags),
+        Err(AppError::UnknownModule { .. })
+    ));
 }
 
 #[test]
@@ -84,7 +95,18 @@ fn validate_rejects_a_command_module_without_commands() {
     tags.remove("music");
 
     assert!(matches!(
-        validate(&tags),
+        validate(&full_catalogue(), &tags),
+        Err(AppError::ModuleWithoutCommands("music"))
+    ));
+}
+
+#[test]
+fn a_bot_linking_a_subset_validates() {
+    let none = BTreeMap::new();
+
+    assert!(validate(&["ai"], &none).is_ok());
+    assert!(matches!(
+        validate(&["music"], &none),
         Err(AppError::ModuleWithoutCommands("music"))
     ));
 }

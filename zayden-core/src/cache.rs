@@ -17,7 +17,6 @@ use serenity::all::{ApplicationId, Context, DataUri, Emoji, EmojiId, HttpError};
 use serenity::small_fixed_array::FixedString;
 use tracing::{error, warn};
 
-const ZAYDEN_ID: ApplicationId = ApplicationId::new(787_490_197_943_091_211);
 const PARENT_EMOJI_ATTEMPTS: u32 = 3;
 const PARENT_EMOJI_BACKOFF: Duration = Duration::from_secs(1);
 const PARENT_EMOJI_MAX_WAIT: Duration = Duration::from_secs(30);
@@ -26,28 +25,40 @@ const LOGGED_BODY_LIMIT: usize = 512;
 pub type EmojiResult<T> = Result<T, String>;
 
 #[derive(Clone, Default)]
-pub struct EmojiCache(HashMap<FixedString<u8>, EmojiId>);
+pub struct EmojiCache {
+    emojis: HashMap<FixedString<u8>, EmojiId>,
+    parent: Option<ApplicationId>,
+}
 
 impl EmojiCache {
     pub async fn new(ctx: &Context) -> serenity::Result<Self> {
-        Ok(Self(
-            ctx.get_application_emojis()
+        Ok(Self {
+            emojis: ctx
+                .get_application_emojis()
                 .await?
                 .into_iter()
                 .map(|emoji| (emoji.name, emoji.id))
                 .collect(),
-        ))
+            parent: None,
+        })
+    }
+
+    #[must_use]
+    pub fn with_parent(mut self, parent: ApplicationId) -> Self {
+        self.parent = Some(parent);
+        self
     }
 
     pub async fn new_from_parent(
         ctx: &Context,
+        parent: ApplicationId,
         parent_token: &str,
     ) -> serenity::Result<Self> {
         let current_emojis = ctx.get_application_emojis().await?;
 
         let client = Client::new();
 
-        let parent_emojis = Self::parent_emojis(parent_token).await;
+        let parent_emojis = Self::parent_emojis(parent, parent_token).await;
 
         let mut emojis = current_emojis
             .into_iter()
@@ -93,11 +104,16 @@ impl EmojiCache {
             }
         }
 
-        Ok(Self(emojis))
+        Ok(Self { emojis, parent: Some(parent) })
     }
 
     pub async fn upload(&mut self, ctx: &Context, parent_token: &str, name: &str) {
-        let zayden_emojis = Self::parent_emojis(parent_token).await;
+        let Some(parent) = self.parent else {
+            warn!(emoji = name, "EmojiCache::upload: no parent application");
+            return;
+        };
+
+        let zayden_emojis = Self::parent_emojis(parent, parent_token).await;
 
         let Some(&emoji_id) = zayden_emojis.get(name) else {
             warn!(emoji = name, "EmojiCache::upload: emoji not found on Zayden");
@@ -133,7 +149,7 @@ impl EmojiCache {
             .await
         {
             Ok(emoji) => {
-                self.0.insert(emoji.name, emoji.id);
+                self.emojis.insert(emoji.name, emoji.id);
             },
             // Emoji already uploaded
             Err(serenity::Error::Http(HttpError::UnsuccessfulRequest(resp)))
@@ -141,7 +157,7 @@ impl EmojiCache {
                     e.code == "APPLICATION_EMOJI_NAME_ALREADY_TAKEN"
                 }) =>
             {
-                self.0.insert(FixedString::from_str_trunc(name), emoji_id);
+                self.emojis.insert(FixedString::from_str_trunc(name), emoji_id);
             },
             Err(e) => error!(
                 error = ?e,
@@ -151,13 +167,16 @@ impl EmojiCache {
         }
     }
 
-    async fn parent_emojis(parent_token: &str) -> HashMap<FixedString<u8>, EmojiId> {
+    async fn parent_emojis(
+        parent: ApplicationId,
+        parent_token: &str,
+    ) -> HashMap<FixedString<u8>, EmojiId> {
         let Some(client) = parent_client(parent_token) else {
             return HashMap::new();
         };
 
         let url =
-            format!("https://discord.com/api/v10/applications/{ZAYDEN_ID}/emojis");
+            format!("https://discord.com/api/v10/applications/{parent}/emojis");
 
         let mut backoff = PARENT_EMOJI_BACKOFF;
 
@@ -199,18 +218,20 @@ impl EmojiCache {
 
     pub fn merge_from(&mut self, other: &Self) {
         for (name, &id) in other.iter() {
-            self.0.entry(name.clone()).or_insert(id);
+            self.emojis.entry(name.clone()).or_insert(id);
         }
     }
 }
 
 impl<S: AsRef<str>> FromIterator<(S, EmojiId)> for EmojiCache {
     fn from_iter<T: IntoIterator<Item = (S, EmojiId)>>(iter: T) -> Self {
-        Self(
-            iter.into_iter()
+        Self {
+            emojis: iter
+                .into_iter()
                 .map(|(name, id)| (FixedString::from_str_trunc(name.as_ref()), id))
                 .collect(),
-        )
+            parent: None,
+        }
     }
 }
 
@@ -218,7 +239,7 @@ impl Deref for EmojiCache {
     type Target = HashMap<FixedString<u8>, EmojiId>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.emojis
     }
 }
 

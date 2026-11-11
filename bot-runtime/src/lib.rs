@@ -156,7 +156,9 @@ impl Boot {
 
         let registry =
             build_registry(&modules).map_err(|e| BotError::Other(e.to_string()))?;
-        zayden_app::modules::validate(&registry.commands_by_module())?;
+        let linked_ids = modules.ids();
+        let linked = linked_ids.iter().map(String::as_str).collect::<Vec<_>>();
+        zayden_app::modules::validate(&linked, &registry.commands_by_module())?;
         let status_modules = Arc::clone(&modules);
         let status_db = app_state.db.clone();
 
