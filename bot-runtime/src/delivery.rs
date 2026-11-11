@@ -116,7 +116,7 @@ impl Reconciler {
                 }
             },
             Err(e) => {
-                warn!(error = ?e, "failed to list guilds with delivery targets")
+                warn!(error = ?e, "failed to list guilds with delivery targets");
             },
         }
     }

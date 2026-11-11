@@ -331,7 +331,6 @@ dependencies = [
  "dotenvy",
  "futures",
  "jiff",
- "jiff-cron",
  "metrics",
  "rustls",
  "schema",

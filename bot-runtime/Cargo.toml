@@ -22,7 +22,6 @@ async-trait = { workspace = true }
 dotenvy = { workspace = true }
 futures = { workspace = true, features = ["async-await"] }
 jiff = { workspace = true }
-jiff-cron = { workspace = true }
 metrics = { workspace = true }
 rustls = { workspace = true, features = ["aws-lc-rs"] }
 secrecy = { workspace = true }
