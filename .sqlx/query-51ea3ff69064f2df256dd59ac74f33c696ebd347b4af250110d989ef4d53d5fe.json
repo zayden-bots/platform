@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT delivery_application_id FROM deadlock_squad_channel\n                     WHERE guild_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "delivery_application_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "deadlock_squad_channel",
+            "name": "delivery_application_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "51ea3ff69064f2df256dd59ac74f33c696ebd347b4af250110d989ef4d53d5fe"
+}

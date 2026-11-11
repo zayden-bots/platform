@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO deadlock_patch_announce (guild_id, channel_id)\n                 VALUES ($1, $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b57ce1f9a202aeebc0e302f0fafa7b70f1f07e4046e02423e7c16972dea9d4e4"
+}

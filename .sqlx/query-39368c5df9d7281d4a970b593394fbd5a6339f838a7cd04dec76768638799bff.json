@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT delivery_application_id FROM patreon_announce\n                     WHERE guild_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "delivery_application_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "patreon_announce",
+            "name": "delivery_application_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "39368c5df9d7281d4a970b593394fbd5a6339f838a7cd04dec76768638799bff"
+}

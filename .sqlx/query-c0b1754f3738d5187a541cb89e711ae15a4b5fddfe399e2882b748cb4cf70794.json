@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO deadlock_summary_channel (guild_id, channel_id)\n                 VALUES ($1, $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c0b1754f3738d5187a541cb89e711ae15a4b5fddfe399e2882b748cb4cf70794"
+}

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT delivery_application_id FROM youtube_announce\n                     WHERE guild_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "delivery_application_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "youtube_announce",
+            "name": "delivery_application_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "5731fb4247b146a9e95a947d970f4b814cb1a4955ea21e41159c70b7d57bd2da"
+}

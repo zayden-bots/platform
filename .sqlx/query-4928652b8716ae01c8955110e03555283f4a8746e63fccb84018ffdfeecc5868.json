@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE youtube_announce SET delivery_application_id = $2\n                     WHERE guild_id = $1\n                       AND delivery_application_id IS DISTINCT FROM $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4928652b8716ae01c8955110e03555283f4a8746e63fccb84018ffdfeecc5868"
+}

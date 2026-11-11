@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE deadlock_patch_announce SET delivery_application_id = $2\n                     WHERE guild_id = $1\n                       AND delivery_application_id IS DISTINCT FROM $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2478899a8f62d207fa14974ab83d0ce6bbbfccb401e1184cefd245044881ee53"
+}

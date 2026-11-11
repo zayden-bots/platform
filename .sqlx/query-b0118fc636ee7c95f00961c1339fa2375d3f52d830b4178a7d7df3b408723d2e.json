@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT delivery_application_id FROM deadlock_patch_announce\n                     WHERE guild_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "delivery_application_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "deadlock_patch_announce",
+            "name": "delivery_application_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "b0118fc636ee7c95f00961c1339fa2375d3f52d830b4178a7d7df3b408723d2e"
+}
