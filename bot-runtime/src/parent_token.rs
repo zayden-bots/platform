@@ -1,6 +1,6 @@
 use secrecy::ExposeSecret;
 use tracing::{info, warn};
-use zayden_app::applications::{ApplicationError, ApplicationStore};
+use zayden_app::applications::{AppKind, ApplicationError, ApplicationStore};
 use zayden_app::state::AppState;
 use zayden_core::{Identity, as_i64};
 
@@ -20,13 +20,14 @@ pub async fn parent_token(
 }
 
 pub(crate) async fn publish(app: &AppState, me: Identity) {
-    if !me.is_primary() {
+    if !matches!(me.kind, AppKind::Default) {
         return;
     }
 
     let Some(keyring) = app.keyring.as_deref() else {
         warn!(
-            "no keyring: Zayden's token is not published, so other bots cannot copy its emojis"
+            slot = me.slot.as_str(),
+            "no keyring: this bot's token is not published, so the dashboard and other bots cannot use it"
         );
         return;
     };
@@ -39,8 +40,15 @@ pub(crate) async fn publish(app: &AppState, me: Identity) {
     )
     .await
     {
-        Ok(true) => info!("Zayden's token was sealed into its application row"),
+        Ok(true) => info!(
+            slot = me.slot.as_str(),
+            "this bot's token was sealed into its application row"
+        ),
         Ok(false) => {},
-        Err(e) => warn!(error = %e, "failed to publish Zayden's token"),
+        Err(e) => warn!(
+            slot = me.slot.as_str(),
+            error = %e,
+            "failed to publish this bot's token"
+        ),
     }
 }
