@@ -3867,6 +3867,7 @@ dependencies = [
 [[package]]
 name = "schema"
 version = "1.0.0"
+source = "git+https://github.com/zayden-bots/schema#14c4d212f3506867ceb62a21fdfde3a2557a2e0b"
 dependencies = [
  "sqlx",
 ]
@@ -6074,111 +6075,3 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
-
-[[patch.unused]]
-name = "accounts"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "ai"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "deadlock"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "destiny2"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "family"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "gambling"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "gold-star"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "greetings"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "honeypot"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "hosting"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "jellyfin"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "levels"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "lfg"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "llamad2"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "marathon"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "misc"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "moderation"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "music"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "palworld"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "patreon"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "reaction-roles"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "suggestions"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "temp-voice"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "ticket"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "verify"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "watch"
-version = "1.0.0"
-
-[[patch.unused]]
-name = "youtube"
-version = "1.0.0"
