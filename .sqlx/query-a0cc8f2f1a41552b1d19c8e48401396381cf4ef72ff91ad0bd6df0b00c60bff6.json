@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO delivery_webhooks\n                 (channel_id, application_id, guild_id, webhook_id,\n                  token_ct, token_nonce, key_id)\n             VALUES ($1, $2, $3, $4, $5, $6, $7)\n             ON CONFLICT (channel_id, application_id) DO UPDATE SET\n                 guild_id = EXCLUDED.guild_id,\n                 webhook_id = EXCLUDED.webhook_id,\n                 token_ct = EXCLUDED.token_ct,\n                 token_nonce = EXCLUDED.token_nonce,\n                 key_id = EXCLUDED.key_id,\n                 broken_at = NULL,\n                 created_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Bytea",
+        "Bytea",
+        "Int2"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a0cc8f2f1a41552b1d19c8e48401396381cf4ef72ff91ad0bd6df0b00c60bff6"
+}

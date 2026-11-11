@@ -15,6 +15,8 @@ use zayden_core::{
     CronResult,
     PendingJob,
     RuntimeState,
+    WorkerJob,
+    WorkerJobResult,
     earliest_pending,
     prune_exhausted,
 };
@@ -24,11 +26,9 @@ use crate::Result;
 pub struct EntitlementSweepCron;
 
 impl EntitlementSweepCron {
-    pub fn cron_job(
-        entitlements: Arc<EntitlementService>,
-    ) -> std::result::Result<CronJob, jiff_cron::error::Error> {
-        CronJob::new("entitlement_expiry_sweep", "0 0 * * * * *").map(|job| {
-            job.set_action(move |_ctx, _pool| {
+    pub fn worker_job(entitlements: Arc<EntitlementService>) -> WorkerJobResult {
+        WorkerJob::new("entitlement_expiry_sweep", "0 0 * * * * *").map(|job| {
+            job.set_action(move |_cx| {
                 let entitlements = Arc::clone(&entitlements);
                 async move {
                     match entitlements.refresh_expired_cache_rows().await {

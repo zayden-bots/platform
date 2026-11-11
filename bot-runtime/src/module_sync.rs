@@ -231,7 +231,9 @@ pub fn spawn_listener(
                     | AppEvent::ServingChanged(_)
                     | AppEvent::CustomBotsChanged(_)
                     | AppEvent::LoadoutsChanged
-                    | AppEvent::TaskScheduled(_),
+                    | AppEvent::TaskScheduled(_)
+                    | AppEvent::DeliveryChanged(_)
+                    | AppEvent::WebhookBroken { .. },
                 ) => {},
                 Err(RecvError::Lagged(n)) => {
                     warn!(

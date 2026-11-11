@@ -81,14 +81,43 @@ impl Keyring {
         application_id: i64,
         token: &SecretString,
     ) -> Result<SealedToken, ApplicationError> {
+        self.seal_with(&application_id.to_be_bytes(), token)
+    }
+
+    pub fn open(
+        &self,
+        application_id: i64,
+        sealed: &SealedToken,
+    ) -> Result<SecretString, ApplicationError> {
+        self.open_with(&application_id.to_be_bytes(), sealed)
+    }
+
+    pub fn seal_webhook(
+        &self,
+        webhook_id: i64,
+        token: &SecretString,
+    ) -> Result<SealedToken, ApplicationError> {
+        self.seal_with(&webhook_aad(webhook_id), token)
+    }
+
+    pub fn open_webhook(
+        &self,
+        webhook_id: i64,
+        sealed: &SealedToken,
+    ) -> Result<SecretString, ApplicationError> {
+        self.open_with(&webhook_aad(webhook_id), sealed)
+    }
+
+    fn seal_with(
+        &self,
+        aad: &[u8],
+        token: &SecretString,
+    ) -> Result<SealedToken, ApplicationError> {
         let key = self.key(self.active)?;
         let mut ciphertext = token.expose_secret().as_bytes().to_vec();
 
         let nonce = key
-            .seal_in_place_append_tag(
-                Aad::from(application_id.to_be_bytes()),
-                &mut ciphertext,
-            )
+            .seal_in_place_append_tag(Aad::from(aad), &mut ciphertext)
             .map_err(ApplicationError::Encrypt)?;
 
         Ok(SealedToken {
@@ -98,9 +127,9 @@ impl Keyring {
         })
     }
 
-    pub fn open(
+    fn open_with(
         &self,
-        application_id: i64,
+        aad: &[u8],
         sealed: &SealedToken,
     ) -> Result<SecretString, ApplicationError> {
         let key = self.key(sealed.key_id)?;
@@ -109,11 +138,7 @@ impl Keyring {
         let mut in_out = sealed.ciphertext.clone();
 
         let plaintext = key
-            .open_in_place(
-                nonce,
-                Aad::from(application_id.to_be_bytes()),
-                &mut in_out,
-            )
+            .open_in_place(nonce, Aad::from(aad), &mut in_out)
             .map_err(ApplicationError::Decrypt)?;
 
         Ok(SecretString::from(String::from_utf8(plaintext.to_vec())?))
@@ -122,6 +147,13 @@ impl Keyring {
     fn key(&self, id: i16) -> Result<&RandomizedNonceKey, ApplicationError> {
         self.keys.get(&id).ok_or(ApplicationError::UnknownKey(id))
     }
+}
+
+fn webhook_aad(webhook_id: i64) -> [u8; 16] {
+    let mut aad = [0; 16];
+    aad[..8].copy_from_slice(b"webhook:");
+    aad[8..].copy_from_slice(&webhook_id.to_be_bytes());
+    aad
 }
 
 fn parse_key_id(id: &str) -> Result<i16, ApplicationError> {

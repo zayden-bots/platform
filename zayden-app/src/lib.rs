@@ -1,5 +1,6 @@
 pub mod applications;
 pub mod config;
+pub mod delivery;
 pub mod entitlement;
 pub mod error;
 pub mod events;

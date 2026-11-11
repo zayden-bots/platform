@@ -10,7 +10,7 @@ use tracing::{debug, error, trace, warn};
 use zayden_app::state::AppState;
 use zayden_core::ctx::EventCtx;
 use zayden_core::module::Screen;
-use zayden_core::{CronJob, Identity, RuntimeState};
+use zayden_core::{Identity, RuntimeState};
 
 mod entitlement;
 mod guild_create;
@@ -20,6 +20,7 @@ mod interaction;
 mod ready;
 
 use crate::CommandRegistry;
+use crate::delivery::{DeliveryHandle, DeliveryJob};
 use crate::modules::ModuleSet;
 
 pub struct Handler {
@@ -28,7 +29,7 @@ pub struct Handler {
     pub bot_state: Arc<RwLock<RuntimeState>>,
     pub registry: Arc<CommandRegistry>,
     pub cron_started: OnceLock<()>,
-    pub primary_jobs: Vec<CronJob>,
+    pub(crate) delivery: OnceLock<DeliveryHandle>,
     pub me: Identity,
 }
 
@@ -55,7 +56,8 @@ impl EventHandler for Handler {
             | Event::ThreadDelete(_)
             | Event::EntitlementCreate(_)
             | Event::EntitlementUpdate(_)
-            | Event::EntitlementDelete(_) => Some(event),
+            | Event::EntitlementDelete(_)
+            | Event::WebhookUpdate(_) => Some(event),
             Event::CommandPermissionsUpdate(_)
             | Event::AutoModRuleCreate(_)
             | Event::AutoModRuleUpdate(_)
@@ -94,7 +96,6 @@ impl EventHandler for Handler {
             | Event::UserUpdate(_)
             | Event::VoiceServerUpdate(_)
             | Event::VoiceChannelStatusUpdate(_)
-            | Event::WebhookUpdate(_)
             | Event::IntegrationCreate(_)
             | Event::IntegrationUpdate(_)
             | Event::IntegrationDelete(_)
@@ -152,7 +153,19 @@ impl EventHandler for Handler {
 
         let result = match ev {
             FullEvent::GuildCreate { guild, .. } => {
+                if let Some(delivery) = self.delivery.get() {
+                    delivery.request(DeliveryJob::Guild(guild.id));
+                }
                 Self::guild_create(self, ctx, guild, &pool).await
+            },
+            FullEvent::WebhookUpdate { guild_id, belongs_to_channel_id, .. } => {
+                if let Some(delivery) = self.delivery.get() {
+                    delivery.request(DeliveryJob::Webhooks(
+                        *guild_id,
+                        *belongs_to_channel_id,
+                    ));
+                }
+                return;
             },
             FullEvent::GuildDelete { incomplete, .. } => {
                 Self::guild_delete(self, incomplete, &pool).await

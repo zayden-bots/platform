@@ -6,7 +6,7 @@ use zayden_app::entitlement::Tier;
 use zayden_app::tasks::Task;
 
 use crate::Identity;
-use crate::cron::CronResult;
+use crate::cron::{CronCtx, CronResult, WorkerJobResult};
 use crate::ctx::{
     AutocompleteCtx,
     ComponentCtx,
@@ -92,13 +92,8 @@ pub trait Module: Send + Sync + 'static {
         Ok(())
     }
 
-    /// Runs in every bot process; act only on rows this application authored.
+    /// Runs in every bot process.
     fn entity_jobs(&self, _me: Identity) -> Vec<CronResult> {
-        Vec::new()
-    }
-
-    /// Runs only in the primary process until the worker exists.
-    fn worker_jobs(&self) -> Vec<CronResult> {
         Vec::new()
     }
 
@@ -117,6 +112,14 @@ pub trait Module: Send + Sync + 'static {
 
     /// Runs once per process, on the first `Ready`.
     fn on_start(&self, _cx: &StartCtx<'_>) {}
+}
+
+pub trait WorkerModule: Send + Sync + 'static {
+    fn id(&self) -> &'static str;
+
+    fn jobs(&self) -> Vec<WorkerJobResult>;
+
+    fn on_start(&self, _cx: &CronCtx) {}
 }
 
 pub fn require<T>(

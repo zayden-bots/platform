@@ -21,11 +21,22 @@ pub struct ModuleCtx<'a> {
     pub me: Identity,
 }
 
+impl ModuleCtx<'_> {
+    #[must_use]
+    pub const fn worker(&self) -> WorkerModuleCtx<'_> {
+        WorkerModuleCtx { app: self.app, config: self.config }
+    }
+}
+
+pub struct WorkerModuleCtx<'a> {
+    pub app: &'a Arc<AppState>,
+    pub config: &'a BotConfig,
+}
+
 pub struct StartCtx<'a> {
     pub ctx: &'a Context,
     pub app: Arc<AppState>,
     pub ready: &'a Ready,
-    pub primary: bool,
     pub me: Identity,
 }
 

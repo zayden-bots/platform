@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use serenity::all::{HttpError, JsonErrorCode, StatusCode};
+use zayden_app::applications::ApplicationError;
 
 pub trait Respond: std::error::Error {
     fn user_message(&self) -> Option<Cow<'_, str>> {
@@ -109,6 +110,20 @@ impl ModuleError {
     ) -> Self {
         Self::Init { module, source: source.into() }
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum DeliveryError {
+    #[error(transparent)]
+    Sql(#[from] sqlx::Error),
+    #[error(transparent)]
+    Seal(#[from] ApplicationError),
+    #[error(transparent)]
+    Discord(#[from] serenity::Error),
+    #[error(transparent)]
+    Encode(#[from] serde_json::Error),
+    #[error("the webhook did not return the posted message")]
+    NoMessage,
 }
 
 #[derive(Debug)]

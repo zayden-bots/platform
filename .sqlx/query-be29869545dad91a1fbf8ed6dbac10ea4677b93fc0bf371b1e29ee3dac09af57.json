@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE delivery_webhooks SET broken_at = now()\n             WHERE channel_id = $1\n               AND application_id = $2\n               AND webhook_id = $3\n               AND broken_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "be29869545dad91a1fbf8ed6dbac10ea4677b93fc0bf371b1e29ee3dac09af57"
+}

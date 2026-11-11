@@ -27,11 +27,32 @@ pub use cdn::{is_discord_cdn, refresh_attachment_url};
 pub mod cron;
 pub use cron::{
     ActionFn,
+    CronCtx,
     CronJob,
     CronResult,
     PendingJob,
+    Scheduled,
+    WorkerActionFn,
+    WorkerJob,
+    WorkerJobResult,
     earliest_pending,
     prune_exhausted,
+};
+
+pub mod post;
+pub use post::Post;
+
+pub mod delivery;
+pub use delivery::{
+    DM_TASK,
+    Delivered,
+    DmPayload,
+    Edited,
+    POST_TASK,
+    PostPayload,
+    WebhookPool,
+    queue_dm,
+    queue_post,
 };
 
 pub mod dispatch_map;
@@ -54,7 +75,7 @@ pub mod announce;
 pub mod templates;
 
 pub mod error;
-pub use error::{CoreError, HandlerError, ModuleError, Respond};
+pub use error::{CoreError, DeliveryError, HandlerError, ModuleError, Respond};
 
 pub mod html;
 
@@ -87,6 +108,7 @@ pub use ctx::{
     ModuleCtx,
     StartCtx,
     TaskCtx,
+    WorkerModuleCtx,
 };
 
 pub mod identity;
@@ -101,6 +123,7 @@ pub use module::{
     ModuleComponent,
     ModuleModal,
     Screen,
+    WorkerModule,
     require,
 };
 

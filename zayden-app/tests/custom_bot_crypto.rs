@@ -25,6 +25,29 @@ fn a_sealed_token_opens_to_the_original() {
 }
 
 #[test]
+fn seal_webhook_round_trips() {
+    let keys = keyring("1");
+    let sealed = keys
+        .seal_webhook(APPLICATION, &SecretString::from(TOKEN.to_owned()))
+        .unwrap();
+
+    assert_eq!(
+        keys.open_webhook(APPLICATION, &sealed).unwrap().expose_secret(),
+        TOKEN
+    );
+}
+
+#[test]
+fn a_webhook_seal_does_not_open_as_an_application_token() {
+    let keys = keyring("1");
+    let sealed = keys
+        .seal_webhook(APPLICATION, &SecretString::from(TOKEN.to_owned()))
+        .unwrap();
+
+    assert!(keys.open(APPLICATION, &sealed).is_err());
+}
+
+#[test]
 fn sealing_twice_uses_fresh_nonces() {
     let keys = keyring("1");
     let token = SecretString::from(TOKEN.to_owned());

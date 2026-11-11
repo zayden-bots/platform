@@ -6,6 +6,8 @@ pub use store::ScheduledTasks;
 
 pub const MAX_ATTEMPTS: i16 = 5;
 pub const STALE_AFTER: jiff::SignedDuration = jiff::SignedDuration::from_mins(10);
+pub const PLATFORM_STALE_AFTER: jiff::SignedDuration =
+    jiff::SignedDuration::from_hours(1);
 pub const CLAIM_TIMEOUT: jiff::SignedDuration = jiff::SignedDuration::from_mins(5);
 
 #[derive(Debug, Clone, PartialEq, Eq)]

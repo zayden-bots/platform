@@ -18,5 +18,7 @@ pub enum AppEvent {
     CustomBotsChanged(u64),
     LoadoutsChanged,
     TaskScheduled(u64),
+    DeliveryChanged(u64),
+    WebhookBroken { guild_id: u64, channel_id: u64, application_id: u64 },
     Resync,
 }

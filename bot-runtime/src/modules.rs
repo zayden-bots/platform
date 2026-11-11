@@ -30,7 +30,7 @@ fn task_routes(
     let mut routes = HashMap::new();
     for (idx, module) in modules.iter().enumerate() {
         for kind in module.task_kinds() {
-            if routes.insert(*kind, idx).is_some() {
+            if kind.starts_with("platform.") || routes.insert(*kind, idx).is_some() {
                 return Err(BotError::DuplicateTaskKind(kind));
             }
         }
@@ -74,10 +74,6 @@ impl ModuleSet {
 
     pub fn entity_jobs(&self, me: Identity) -> Vec<CronResult> {
         self.modules.iter().flat_map(|module| module.entity_jobs(me)).collect()
-    }
-
-    pub fn worker_jobs(&self) -> Vec<CronResult> {
-        self.modules.iter().flat_map(|module| module.worker_jobs()).collect()
     }
 
     pub fn task_kinds(&self) -> Vec<&'static str> {
@@ -182,13 +178,10 @@ impl ModuleList {
         }
     }
 
-    pub fn finish(
-        self,
-        primary_jobs: Vec<CronResult>,
-    ) -> Result<Assembly, BotError> {
+    pub fn finish(self) -> Result<Assembly, BotError> {
         task_routes(&self.modules)?;
         if self.errors.is_empty() {
-            Ok(Assembly { modules: self.modules, primary_jobs })
+            Ok(Assembly { modules: self.modules })
         } else {
             Err(BotError::Modules(ModuleErrors(self.errors)))
         }
@@ -197,5 +190,4 @@ impl ModuleList {
 
 pub struct Assembly {
     pub modules: Vec<Box<dyn Module>>,
-    pub primary_jobs: Vec<CronResult>,
 }

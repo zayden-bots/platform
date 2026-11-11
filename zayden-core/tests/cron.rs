@@ -166,7 +166,7 @@ fn run_time_is_always_strictly_after_now() {
 /// An empty registry is not an error, and no job is invented.
 #[test]
 fn no_jobs_means_nothing_pending() {
-    let pending = earliest_pending(&[], &utc!(2026, 8, 6, 12, 0, 0));
+    let pending = earliest_pending::<CronJob>(&[], &utc!(2026, 8, 6, 12, 0, 0));
 
     assert!(pending.is_empty());
 }

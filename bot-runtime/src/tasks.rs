@@ -3,14 +3,30 @@ use std::time::Duration;
 
 use futures::future::join_all;
 use jiff::Timestamp;
-use serenity::all::Context;
+use serenity::all::{
+    ChannelId,
+    Context,
+    HttpError,
+    JsonErrorCode,
+    MessageId,
+    StatusCode,
+    UserId,
+};
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::{self};
 use tracing::{error, warn};
 use zayden_app::events::AppEvent;
 use zayden_app::state::AppState;
-use zayden_app::tasks::{ScheduledTasks, Task};
-use zayden_core::{Identity, TaskCtx};
+use zayden_app::tasks::{PLATFORM_STALE_AFTER, ScheduledTasks, Task};
+use zayden_core::{
+    DM_TASK,
+    DmPayload,
+    HandlerError,
+    Identity,
+    POST_TASK,
+    PostPayload,
+    TaskCtx,
+};
 
 use crate::modules::ModuleSet;
 
@@ -26,10 +42,8 @@ pub(crate) fn spawn_task_runner(
     modules: Arc<ModuleSet>,
     me: Identity,
 ) {
-    let kinds = modules.task_kinds();
-    if kinds.is_empty() {
-        return;
-    }
+    let mut kinds = modules.task_kinds();
+    kinds.extend([POST_TASK, DM_TASK]);
 
     let mut events = Some(app.subscribe());
 
@@ -80,6 +94,9 @@ async fn poll(
         let owned = task.clone();
         let handle = tokio::spawn(async move {
             tokio::time::timeout(TASK_TIMEOUT, async {
+                if matches!(owned.kind.as_str(), POST_TASK | DM_TASK) {
+                    return Some(run_platform(&ctx, &owned).await);
+                }
                 let cx = TaskCtx { ctx: &ctx, app, me };
                 modules.run_task(&cx, &owned).await
             })
@@ -129,6 +146,69 @@ async fn poll(
     .await;
 
     Ok(full)
+}
+
+async fn run_platform(ctx: &Context, task: &Task) -> Result<(), HandlerError> {
+    if Timestamp::now().duration_since(task.run_at) > PLATFORM_STALE_AFTER {
+        warn!(kind = task.kind, key = task.key, "platform task dropped as stale");
+        return Ok(());
+    }
+
+    let sent = if task.kind == POST_TASK {
+        let payload = task.payload::<PostPayload>().map_err(HandlerError::new)?;
+        send_post(ctx, &payload).await
+    } else {
+        let payload = task.payload::<DmPayload>().map_err(HandlerError::new)?;
+        send_dm(ctx, &payload).await
+    };
+
+    if let Err(e) = sent {
+        warn!(
+            kind = task.kind,
+            key = task.key,
+            error = ?e,
+            "platform task failed",
+        );
+    }
+    Ok(())
+}
+
+async fn send_post(ctx: &Context, payload: &PostPayload) -> serenity::Result<()> {
+    let channel = ChannelId::new(payload.channel_id).widen();
+
+    if let Some(message_id) = payload.edit_message_id {
+        match ctx
+            .http
+            .edit_message(
+                channel,
+                MessageId::new(message_id),
+                &payload.message,
+                Vec::new(),
+            )
+            .await
+        {
+            Ok(_) => return Ok(()),
+            Err(e) if is_missing_message(&e) => {},
+            Err(e) => return Err(e),
+        }
+    }
+
+    ctx.http.send_message(channel, Vec::new(), &payload.message).await?;
+    Ok(())
+}
+
+async fn send_dm(ctx: &Context, payload: &DmPayload) -> serenity::Result<()> {
+    let dm = UserId::new(payload.user_id).create_dm_channel(&ctx.http).await?;
+    ctx.http.send_message(dm.id.widen(), Vec::new(), &payload.message).await?;
+    Ok(())
+}
+
+fn is_missing_message(e: &serenity::Error) -> bool {
+    let serenity::Error::Http(HttpError::UnsuccessfulRequest(response)) = e else {
+        return false;
+    };
+    response.error.code == JsonErrorCode::UnknownMessage
+        || response.status_code == StatusCode::FORBIDDEN
 }
 
 async fn complete(app: &AppState, task: &Task) {

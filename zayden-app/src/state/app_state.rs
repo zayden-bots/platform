@@ -6,6 +6,7 @@ use sqlx::PgPool;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
 
+use crate::applications::Keyring;
 use crate::config::{BotConfig, RadioStation, SettingsRegistry};
 use crate::entitlement::{EntitlementService, Tier};
 use crate::events::AppEvent;
@@ -46,6 +47,7 @@ pub struct AppState {
     pub zayden_guild: u64,
     pub auto_leave: bool,
     pub upgrade_url: Option<String>,
+    pub keyring: Option<Arc<Keyring>>,
 
     pub sku_tiers: HashMap<u64, Tier>,
     pub radio_stations: Arc<[RadioStation]>,
@@ -74,6 +76,14 @@ impl AppState {
         if let Some(sku) = config.discord_sku_ultra {
             sku_tiers.insert(sku, Tier::Ultra);
         }
+
+        let keyring = match Keyring::from_env() {
+            Ok(keyring) => Some(Arc::new(keyring)),
+            Err(e) => {
+                tracing::warn!(error = %e, "no keyring: delivery webhooks are disabled");
+                None
+            },
+        };
 
         Self {
             db: pool,
@@ -108,6 +118,7 @@ impl AppState {
             zayden_guild: config.zayden_guild,
             auto_leave: config.auto_leave,
             upgrade_url: config.upgrade_url.clone(),
+            keyring,
             sku_tiers,
             radio_stations: Arc::clone(&config.radio_stations),
         }

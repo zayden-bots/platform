@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO applications (application_id, slot, kind, bot_user_id, name, avatar)\n         VALUES ($1, 'zayden', 'default', 1001, $2, $3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f248586e4ee919756a12b0b1e9060a8dda0b09b97688aa2fa5f8d3cf2fbc8439"
+}

@@ -15,10 +15,12 @@ pub enum Channel {
     CustomBotsChanged,
     LoadoutsChanged,
     TaskScheduled,
+    DeliveryChanged,
+    WebhookBroken,
 }
 
 impl Channel {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 12] = [
         Self::ConfigChanged,
         Self::ModulesChanged,
         Self::EntitlementChanged,
@@ -29,6 +31,8 @@ impl Channel {
         Self::CustomBotsChanged,
         Self::LoadoutsChanged,
         Self::TaskScheduled,
+        Self::DeliveryChanged,
+        Self::WebhookBroken,
     ];
 
     #[must_use]
@@ -44,6 +48,8 @@ impl Channel {
             Self::CustomBotsChanged => "custom_bots_changed",
             Self::LoadoutsChanged => "loadouts_changed",
             Self::TaskScheduled => "task_scheduled",
+            Self::DeliveryChanged => "delivery_changed",
+            Self::WebhookBroken => "webhook_broken",
         }
     }
 
@@ -75,6 +81,16 @@ impl Channel {
             },
             Self::LoadoutsChanged => AppEvent::LoadoutsChanged,
             Self::TaskScheduled => AppEvent::TaskScheduled(payload.parse().ok()?),
+            Self::DeliveryChanged => {
+                AppEvent::DeliveryChanged(payload.parse().ok()?)
+            },
+            Self::WebhookBroken => {
+                let mut parts = payload.splitn(3, ':');
+                let guild_id = parts.next()?.parse().ok()?;
+                let channel_id = parts.next()?.parse().ok()?;
+                let application_id = parts.next()?.parse().ok()?;
+                AppEvent::WebhookBroken { guild_id, channel_id, application_id }
+            },
         };
 
         Some(event)

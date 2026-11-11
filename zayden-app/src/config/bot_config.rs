@@ -168,7 +168,14 @@ pub struct BotConfig {
 
 impl BotConfig {
     pub async fn load(pool: &PgPool) -> Result<Self> {
-        let discord_token = require_env("DISCORD_TOKEN")?.into();
+        Self::load_with(pool, require_env("DISCORD_TOKEN")?.into()).await
+    }
+
+    pub async fn load_without_token(pool: &PgPool) -> Result<Self> {
+        Self::load_with(pool, SecretString::from(String::new())).await
+    }
+
+    async fn load_with(pool: &PgPool, discord_token: SecretString) -> Result<Self> {
         let bungie_api_key = env::var("BUNGIE_API_KEY").ok().map(SecretString::from);
         let ai_provider_key =
             env::var("AI_PROVIDER_KEY").ok().map(SecretString::from);

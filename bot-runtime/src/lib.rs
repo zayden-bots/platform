@@ -14,6 +14,7 @@ use tokio::sync::{OnceCell, RwLock};
 use tracing::info;
 
 pub mod cron;
+mod delivery;
 mod error;
 mod handler;
 mod legacy_bot_tokens;
@@ -27,6 +28,7 @@ pub mod state;
 mod status;
 mod tasks;
 pub mod webhook_logger;
+pub mod worker;
 
 pub use error::{BotError, Result};
 pub use handler::Handler;
@@ -164,7 +166,6 @@ impl Boot {
         let Self { app: app_state, config: bot_config, me, name } = self;
 
         let bot_state_inner = RuntimeState::new();
-        let primary_jobs = cron::collect_jobs(assembly.primary_jobs);
         let modules = Arc::new(ModuleSet::new(assembly.modules)?);
         let bot_state = Arc::new(RwLock::new(bot_state_inner));
 
@@ -186,7 +187,8 @@ impl Boot {
                 | GatewayIntents::GUILD_MESSAGE_REACTIONS
                 | GatewayIntents::GUILD_VOICE_STATES
                 | GatewayIntents::MESSAGE_CONTENT
-                | GatewayIntents::GUILD_PRESENCES,
+                | GatewayIntents::GUILD_PRESENCES
+                | GatewayIntents::GUILD_WEBHOOKS,
         );
         if let Some(voice_manager) = voice_manager {
             builder = builder.voice_manager(voice_manager);
@@ -199,7 +201,7 @@ impl Boot {
                 bot_state,
                 registry,
                 cron_started: OnceLock::new(),
-                primary_jobs,
+                delivery: OnceLock::new(),
                 me,
             }))
             .await?;

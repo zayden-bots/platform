@@ -7,6 +7,8 @@ use zayden_core::Identity;
 
 use crate::modules::ModuleSet;
 
+const WORKER_PROCESS: &str = "worker";
+
 pub(crate) async fn record_start(pool: &PgPool, me: Identity, modules: &ModuleSet) {
     if let Err(e) =
         ApplicationModules::replace(pool, me.application_i64(), &modules.ids()).await
@@ -44,6 +46,30 @@ pub(crate) fn spawn_heartbeat(pool: PgPool, me: Identity) {
             .await
             {
                 warn!(error = ?e, "failed to record the process heartbeat");
+            }
+        }
+    });
+}
+
+pub(crate) async fn record_worker_start(pool: &PgPool) {
+    if let Err(e) =
+        ProcessStatus::started(pool, WORKER_PROCESS, None, &build_sha()).await
+    {
+        error!(error = ?e, "failed to record the worker start");
+    }
+}
+
+pub(crate) fn spawn_worker_heartbeat(pool: PgPool) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        interval.tick().await;
+
+        loop {
+            interval.tick().await;
+            if let Err(e) =
+                ProcessStatus::seen(&pool, WORKER_PROCESS, None, &build_sha()).await
+            {
+                warn!(error = ?e, "failed to record the worker heartbeat");
             }
         }
     });

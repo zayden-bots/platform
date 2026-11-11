@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE guild_presence SET left_at = now() WHERE guild_id = 1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "6e019145e3c38b7ee81336137c49f05a4405f23191c763f94535d6933dad1b06"
+}

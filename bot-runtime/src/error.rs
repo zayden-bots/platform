@@ -24,6 +24,7 @@ pub enum BotError {
 
     Config(zayden_app::AppError),
     Application(zayden_app::applications::ApplicationError),
+    Keyring(zayden_app::applications::ApplicationError),
     Jiff(jiff::Error),
     Modules(ModuleErrors),
     DuplicateTaskKind(&'static str),
@@ -37,6 +38,7 @@ impl std::fmt::Display for BotError {
 
             Self::Config(e) => e.fmt(f),
             Self::Application(e) => e.fmt(f),
+            Self::Keyring(e) => write!(f, "custom bot keyring: {e}"),
             Self::Jiff(e) => e.fmt(f),
             Self::Modules(e) => e.fmt(f),
             Self::DuplicateTaskKind(kind) => {
@@ -51,7 +53,7 @@ impl std::error::Error for BotError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Config(e) => Some(e),
-            Self::Application(e) => Some(e),
+            Self::Application(e) | Self::Keyring(e) => Some(e),
             Self::ZaydenCore(e) => Some(e),
             Self::Jiff(e) => Some(e),
             Self::Modules(_) | Self::DuplicateTaskKind(_) | Self::Other(_) => None,
@@ -66,6 +68,7 @@ impl Respond for BotError {
 
             Self::Config(_)
             | Self::Application(_)
+            | Self::Keyring(_)
             | Self::Jiff(_)
             | Self::Modules(_)
             | Self::DuplicateTaskKind(_)

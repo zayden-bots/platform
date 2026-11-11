@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT g AS \"g!\" FROM (\n                 SELECT t.guild_id AS g\n                 FROM delivery_targets t\n                 WHERE delivery_application(t.guild_id, t.delivery_application_id) = $1\n                 UNION\n                 SELECT w.guild_id AS g\n                 FROM delivery_webhooks w\n                 WHERE w.application_id = $1\n             ) s\n             ORDER BY g",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "g!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "6f63355bcfed12b75714115629e5999b0aa979d199a4ddb001a73de826d8203a"
+}
