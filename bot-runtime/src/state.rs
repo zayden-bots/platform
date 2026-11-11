@@ -12,9 +12,7 @@ pub async fn load_emojis(ctx: &Context, app: &AppState, me: Identity) -> Result<
         EmojiCache::new(ctx).await?.with_parent(parent)
     } else {
         match crate::parent_token(app, me).await {
-            Ok(token) => {
-                EmojiCache::new_from_parent(ctx, parent, &token).await?
-            },
+            Ok(token) => EmojiCache::new_from_parent(ctx, parent, &token).await?,
             Err(e) => {
                 warn!(
                     error = %e,

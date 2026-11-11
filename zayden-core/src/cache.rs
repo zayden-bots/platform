@@ -44,7 +44,7 @@ impl EmojiCache {
     }
 
     #[must_use]
-    pub fn with_parent(mut self, parent: ApplicationId) -> Self {
+    pub const fn with_parent(mut self, parent: ApplicationId) -> Self {
         self.parent = Some(parent);
         self
     }
