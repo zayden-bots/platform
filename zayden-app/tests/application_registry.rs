@@ -1,5 +1,11 @@
 use sqlx::PgPool;
-use zayden_app::applications::{ApplicationModules, ProcessStatus};
+use zayden_app::applications::{
+    ApplicationModules,
+    ApplicationStore,
+    NewApplication,
+    ProcessStatus,
+    Slot,
+};
 
 const APP: i64 = 100;
 const OTHER: i64 = 200;
@@ -59,6 +65,42 @@ async fn replace_leaves_other_applications_alone(pool: PgPool) {
 
     assert_eq!(modules_of(&pool, APP).await, Vec::<String>::new());
     assert_eq!(modules_of(&pool, OTHER).await, ["ticket"]);
+}
+
+#[sqlx::test(migrator = "schema::MIGRATOR")]
+async fn list_returns_offered_modules_sorted(pool: PgPool) {
+    ApplicationModules::replace(&pool, APP, &names(&["ticket", "music"]))
+        .await
+        .unwrap();
+    ApplicationModules::replace(&pool, OTHER, &names(&["ai"])).await.unwrap();
+
+    assert_eq!(ApplicationModules::list(&pool, APP).await.unwrap(), [
+        "music", "ticket"
+    ]);
+}
+
+#[sqlx::test(migrator = "schema::MIGRATOR")]
+async fn process_list_names_bots_and_keeps_the_worker(pool: PgPool) {
+    let app = NewApplication {
+        application_id: APP,
+        slot: Slot::Zayden,
+        bot_user_id: APP,
+        name: "Zayden",
+        avatar: None,
+    };
+    ApplicationStore::register_default(&pool, &app).await.unwrap();
+    ProcessStatus::started(&pool, "worker", None, "abc123").await.unwrap();
+    ProcessStatus::started(&pool, "100", Some(APP), "def456").await.unwrap();
+
+    let rows = ProcessStatus::list(&pool).await.unwrap();
+
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].process, "100");
+    assert_eq!(rows[0].application_id, Some(APP));
+    assert_eq!(rows[0].name.as_deref(), Some("Zayden"));
+    assert_eq!(rows[0].build_sha, "def456");
+    assert_eq!(rows[1].process, "worker");
+    assert_eq!(rows[1].name, None);
 }
 
 #[sqlx::test(migrator = "schema::MIGRATOR")]

@@ -2,7 +2,9 @@ use secrecy::{ExposeSecret, SecretString};
 use sqlx::PgPool;
 use sqlx::postgres::PgListener;
 use zayden_app::applications::{
+    AppKind,
     ApplicationError,
+    ApplicationProfile,
     ApplicationStatus,
     ApplicationStore,
     Keyring,
@@ -10,6 +12,7 @@ use zayden_app::applications::{
     NewCustomApplication,
     Slot,
 };
+use zayden_app::guilds::GuildPresence;
 
 const KEY: &str = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=";
 const SECOND_KEY: &str = "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=";
@@ -57,6 +60,53 @@ async fn a_stored_token_round_trips(pool: PgPool) {
         ApplicationStore::sealed_token(&pool, LLAMA).await.unwrap().unwrap();
 
     assert_eq!(keys.open(LLAMA, &sealed).unwrap().expose_secret(), TOKEN);
+}
+
+#[sqlx::test(migrator = "schema::MIGRATOR")]
+async fn profile_reads_a_registered_default(pool: PgPool) {
+    let app = NewApplication {
+        bot_user_id: 999,
+        avatar: Some("abc123"),
+        ..default_app(ZAYDEN, "Zayden")
+    };
+    ApplicationStore::register_default(&pool, &app).await.unwrap();
+
+    assert_eq!(
+        ApplicationStore::profile(&pool, ZAYDEN).await.unwrap(),
+        Some(ApplicationProfile {
+            application_id: ZAYDEN,
+            slot: Slot::Zayden,
+            kind: AppKind::Default,
+            bot_user_id: 999,
+            name: "Zayden".to_owned(),
+            avatar: Some("abc123".to_owned()),
+        })
+    );
+}
+
+#[sqlx::test(migrator = "schema::MIGRATOR")]
+async fn profile_is_none_for_an_unknown_application(pool: PgPool) {
+    assert_eq!(ApplicationStore::profile(&pool, ZAYDEN).await.unwrap(), None);
+}
+
+#[sqlx::test(migrator = "schema::MIGRATOR")]
+async fn present_in_guild_lists_only_present_applications(pool: PgPool) {
+    let joined = jiff::Timestamp::constant(1_750_000_000, 0);
+    ApplicationStore::register_default(&pool, &default_app(ZAYDEN, "Zayden"))
+        .await
+        .unwrap();
+    let maria =
+        NewApplication { slot: Slot::Maria, ..default_app(OTHER_DEFAULT, "Maria") };
+    ApplicationStore::register_default(&pool, &maria).await.unwrap();
+    GuildPresence::joined(&pool, GUILD, ZAYDEN, joined).await.unwrap();
+    GuildPresence::joined(&pool, GUILD, OTHER_DEFAULT, joined).await.unwrap();
+    GuildPresence::left(&pool, GUILD, ZAYDEN).await.unwrap();
+
+    let present = ApplicationStore::present_in_guild(&pool, GUILD).await.unwrap();
+
+    assert_eq!(present.iter().map(|app| app.application_id).collect::<Vec<_>>(), [
+        OTHER_DEFAULT
+    ]);
 }
 
 #[sqlx::test(migrator = "schema::MIGRATOR")]

@@ -1,0 +1,86 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.process, s.application_id, a.name AS \"name?\",\n                      s.build_sha,\n                      s.started_at AS \"started_at: jiff_sqlx::Timestamp\",\n                      s.last_seen AS \"last_seen: jiff_sqlx::Timestamp\"\n               FROM application_status s\n               LEFT JOIN applications a ON a.application_id = s.application_id\n               ORDER BY s.application_id IS NULL, a.name, s.process",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "process",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "application_status",
+            "name": "process"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "application_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "application_status",
+            "name": "application_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "applications",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "build_sha",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "application_status",
+            "name": "build_sha"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "started_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "application_status",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "last_seen: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "application_status",
+            "name": "last_seen"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0c3562d204689146a0acb92a19fb8d43b53cb28bb137d49ba5d2756729b4eedc"
+}

@@ -6,9 +6,10 @@ mod store;
 
 pub use crypto::{Keyring, SealedToken};
 pub use error::ApplicationError;
-pub use registry::{ApplicationModules, ProcessStatus};
+pub use registry::{ApplicationModules, ProcessRow, ProcessStatus};
 pub use slot::{AppKind, Slot};
 pub use store::{
+    ApplicationProfile,
     ApplicationStatus,
     ApplicationStore,
     NewApplication,

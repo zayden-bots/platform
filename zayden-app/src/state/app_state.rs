@@ -6,7 +6,7 @@ use sqlx::PgPool;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
 
-use crate::applications::Keyring;
+use crate::applications::{Keyring, Slot};
 use crate::config::{BotConfig, RadioStation, SettingsRegistry};
 use crate::entitlement::{EntitlementService, Tier};
 use crate::events::AppEvent;
@@ -44,6 +44,7 @@ pub struct AppState {
     pub normal_log_webhook: SecretString,
     /// Discord user/application ID of the bot itself.
     pub zayden_id: u64,
+    pub maria_id: Option<u64>,
     pub zayden_guild: u64,
     pub auto_leave: bool,
     pub upgrade_url: Option<String>,
@@ -115,12 +116,21 @@ impl AppState {
                 .clone()
                 .unwrap_or_else(|| SecretString::from(String::new())),
             zayden_id: config.zayden_id,
+            maria_id: config.maria_id,
             zayden_guild: config.zayden_guild,
             auto_leave: config.auto_leave,
             upgrade_url: config.upgrade_url.clone(),
             keyring,
             sku_tiers,
             radio_stations: Arc::clone(&config.radio_stations),
+        }
+    }
+
+    #[must_use]
+    pub const fn default_application_id(&self, slot: Slot) -> Option<u64> {
+        match slot {
+            Slot::Zayden => Some(self.zayden_id),
+            Slot::Maria => self.maria_id,
         }
     }
 

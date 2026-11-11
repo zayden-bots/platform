@@ -64,6 +64,9 @@ pub enum ApplicationError {
     #[error("unknown slot `{0}`")]
     UnknownSlot(String),
 
+    #[error("unknown application kind `{0}`")]
+    UnknownKind(String),
+
     #[error("the {} slot already has a default application", .0.name())]
     SlotTaken(Slot),
 

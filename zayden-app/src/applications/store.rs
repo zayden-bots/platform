@@ -1,7 +1,7 @@
 use secrecy::{ExposeSecret, SecretString};
 use sqlx::PgPool;
 
-use super::{ApplicationError, Keyring, SealedToken, Slot};
+use super::{AppKind, ApplicationError, Keyring, SealedToken, Slot};
 
 const DEFAULT_SLOT_INDEX: &str = "applications_default_slot_idx";
 
@@ -35,6 +35,16 @@ pub struct NewCustomApplication<'a> {
     pub app: NewApplication<'a>,
     pub public_key: &'a str,
     pub registered_by: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApplicationProfile {
+    pub application_id: i64,
+    pub slot: Slot,
+    pub kind: AppKind,
+    pub bot_user_id: i64,
+    pub name: String,
+    pub avatar: Option<String>,
 }
 
 pub struct ApplicationStore;
@@ -291,6 +301,59 @@ impl ApplicationStore {
         .await?;
 
         Ok(bot_user_id)
+    }
+
+    pub async fn profile(
+        pool: &PgPool,
+        application_id: i64,
+    ) -> Result<Option<ApplicationProfile>, ApplicationError> {
+        sqlx::query!(
+            "SELECT application_id, slot, kind, bot_user_id, name, avatar
+             FROM applications WHERE application_id = $1",
+            application_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .map(|row| {
+            Ok(ApplicationProfile {
+                application_id: row.application_id,
+                slot: row.slot.parse()?,
+                kind: row.kind.parse()?,
+                bot_user_id: row.bot_user_id,
+                name: row.name,
+                avatar: row.avatar,
+            })
+        })
+        .transpose()
+    }
+
+    pub async fn present_in_guild(
+        pool: &PgPool,
+        guild_id: i64,
+    ) -> Result<Vec<ApplicationProfile>, ApplicationError> {
+        sqlx::query!(
+            "SELECT a.application_id, a.slot, a.kind, a.bot_user_id, a.name,
+                    a.avatar
+             FROM guild_presence p
+             JOIN applications a ON a.application_id = p.application_id
+             WHERE p.guild_id = $1 AND p.left_at IS NULL
+             ORDER BY a.slot, a.kind, a.application_id",
+            guild_id
+        )
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .map(|row| {
+            Ok(ApplicationProfile {
+                application_id: row.application_id,
+                slot: row.slot.parse()?,
+                kind: row.kind.parse()?,
+                bot_user_id: row.bot_user_id,
+                name: row.name,
+                avatar: row.avatar,
+            })
+        })
+        .collect()
     }
 
     pub async fn set_status(

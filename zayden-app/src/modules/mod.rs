@@ -146,6 +146,19 @@ pub const MODULES: &[ModuleDef] = &[
     },
 ];
 
+#[derive(Debug)]
+pub struct PassiveModule {
+    pub id: &'static str,
+    pub label: &'static str,
+}
+
+pub const PASSIVE_MODULES: &[PassiveModule] = &[
+    PassiveModule { id: "levels", label: "Levels" },
+    PassiveModule { id: "honeypot", label: "Honeypot" },
+    PassiveModule { id: "temp_voice", label: "Temp voice" },
+    PassiveModule { id: "reaction_roles", label: "Reaction roles" },
+];
+
 #[must_use]
 pub fn find(id: &str) -> Option<&'static ModuleDef> {
     MODULES.iter().find(|m| m.id == id)

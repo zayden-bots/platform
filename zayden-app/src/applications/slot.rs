@@ -54,3 +54,15 @@ impl AppKind {
         }
     }
 }
+
+impl FromStr for AppKind {
+    type Err = ApplicationError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "default" => Ok(Self::Default),
+            "custom" => Ok(Self::Custom),
+            _ => Err(ApplicationError::UnknownKind(s.to_owned())),
+        }
+    }
+}
