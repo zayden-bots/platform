@@ -49,6 +49,39 @@ async fn replace_inserts_and_replaces_by_prefix(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "schema::MIGRATOR")]
+async fn ensure_keeps_existing_tasks(pool: PgPool) {
+    let original = ago(1);
+    ScheduledTasks::replace(&pool, APP, "e:", &[new_task("k", "e:old", original)])
+        .await
+        .unwrap();
+    let claimed = ScheduledTasks::claim_due(&pool, APP, &["k"], 10).await.unwrap();
+
+    ScheduledTasks::ensure(&pool, APP, &[
+        new_task("k", "e:old", ahead(5)),
+        new_task("k", "e:new", ahead(1)),
+    ])
+    .await
+    .unwrap();
+
+    assert_eq!(keys(&pool).await, ["e:new", "e:old"]);
+    let old = sqlx::query!(
+        r#"SELECT run_at AS "run_at!: jiff_sqlx::Timestamp",
+                  claimed_at AS "claimed_at: jiff_sqlx::Timestamp",
+                  attempts
+           FROM scheduled_tasks WHERE key = 'e:old'"#
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(old.run_at.to_jiff(), claimed[0].run_at);
+    assert_eq!(
+        old.claimed_at.map(jiff_sqlx::Timestamp::to_jiff),
+        Some(claimed[0].claimed_at)
+    );
+    assert_eq!(old.attempts, 1);
+}
+
+#[sqlx::test(migrator = "schema::MIGRATOR")]
 async fn claim_due_returns_only_due_tasks_of_the_app_and_kinds(pool: PgPool) {
     ScheduledTasks::replace(&pool, APP, "due", &[new_task("k", "due", ago(1))])
         .await

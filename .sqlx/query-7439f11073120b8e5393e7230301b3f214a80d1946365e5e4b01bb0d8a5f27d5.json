@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO scheduled_tasks (application_id, kind, key, run_at, payload)\n                 VALUES ($1, $2, $3, $4, $5)\n                 ON CONFLICT (application_id, kind, key) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7439f11073120b8e5393e7230301b3f214a80d1946365e5e4b01bb0d8a5f27d5"
+}

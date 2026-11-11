@@ -50,6 +50,35 @@ impl ScheduledTasks {
         tx.commit().await
     }
 
+    pub async fn ensure(
+        pool: &PgPool,
+        application_id: i64,
+        tasks: &[NewTask],
+    ) -> sqlx::Result<()> {
+        let mut tx = pool.begin().await?;
+
+        for task in tasks {
+            #[expect(
+                trivial_casts,
+                reason = "not a cast: `as T` is sqlx's bind-param type-override syntax, required because TIMESTAMPTZ has no built-in jiff mapping"
+            )]
+            sqlx::query!(
+                "INSERT INTO scheduled_tasks (application_id, kind, key, run_at, payload)
+                 VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT (application_id, kind, key) DO NOTHING",
+                application_id,
+                task.kind,
+                task.key,
+                task.run_at.to_sqlx() as jiff_sqlx::Timestamp,
+                task.payload
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await
+    }
+
     pub async fn cancel(
         pool: &PgPool,
         application_id: i64,

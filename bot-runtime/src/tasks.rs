@@ -17,6 +17,8 @@ use crate::modules::ModuleSet;
 const BATCH: i64 = 25;
 const IDLE: Duration = Duration::from_secs(60);
 const RETRY: Duration = Duration::from_secs(30);
+const MIN_IDLE: Duration = Duration::from_secs(1);
+const TASK_TIMEOUT: Duration = Duration::from_secs(240);
 
 pub(crate) fn spawn_task_runner(
     ctx: Context,
@@ -52,7 +54,7 @@ pub(crate) fn spawn_task_runner(
 async fn poll(
     ctx: &Context,
     app: &Arc<AppState>,
-    modules: &ModuleSet,
+    modules: &Arc<ModuleSet>,
     me: Identity,
     kinds: &[&'static str],
 ) -> sqlx::Result<bool> {
@@ -71,28 +73,59 @@ async fn poll(
         ScheduledTasks::claim_due(&app.db, application_id, kinds, BATCH).await?;
     let full = i64::try_from(batch.len()).is_ok_and(|len| len >= BATCH);
 
-    join_all(batch.iter().map(|task| async move {
-        let cx = TaskCtx { ctx, app: Arc::clone(app), me };
-        match modules.run_task(&cx, task).await {
-            Some(Ok(())) => {},
-            Some(Err(e)) => {
-                error!(
-                    kind = task.kind,
-                    key = task.key,
-                    error = ?e,
-                    "scheduled task failed",
-                );
-            },
-            None => {
-                error!(
-                    kind = task.kind,
-                    key = task.key,
-                    "no module runs this scheduled task kind",
-                );
-            },
-        }
-        complete(app, task).await;
-    }))
+    let spawned = batch.into_iter().map(|task| {
+        let ctx = ctx.clone();
+        let app = Arc::clone(app);
+        let modules = Arc::clone(modules);
+        let owned = task.clone();
+        let handle = tokio::spawn(async move {
+            tokio::time::timeout(TASK_TIMEOUT, async {
+                let cx = TaskCtx { ctx: &ctx, app, me };
+                modules.run_task(&cx, &owned).await
+            })
+            .await
+        });
+        (task, handle)
+    });
+
+    join_all(
+        spawned.map(|(task, handle)| async move {
+            match handle.await {
+                Ok(Ok(Some(Ok(())))) => {},
+                Ok(Ok(Some(Err(e)))) => {
+                    error!(
+                        kind = task.kind,
+                        key = task.key,
+                        error = ?e,
+                        "scheduled task failed",
+                    );
+                },
+                Ok(Ok(None)) => {
+                    error!(
+                        kind = task.kind,
+                        key = task.key,
+                        "no module runs this scheduled task kind",
+                    );
+                },
+                Ok(Err(_)) => {
+                    error!(
+                        kind = task.kind,
+                        key = task.key,
+                        "scheduled task timed out",
+                    );
+                },
+                Err(e) => {
+                    error!(
+                        kind = task.kind,
+                        key = task.key,
+                        error = ?e,
+                        "scheduled task panicked",
+                    );
+                },
+            }
+            complete(app, &task).await;
+        }),
+    )
     .await;
 
     Ok(full)
@@ -117,7 +150,7 @@ async fn next_delay(
     match ScheduledTasks::next_due(&app.db, application_id, kinds).await {
         Ok(Some(next)) => Duration::try_from(Timestamp::now().duration_until(next))
             .unwrap_or(Duration::ZERO)
-            .min(IDLE),
+            .clamp(MIN_IDLE, IDLE),
         Ok(None) => IDLE,
         Err(e) => {
             warn!(error = ?e, "scheduled task poll failed");

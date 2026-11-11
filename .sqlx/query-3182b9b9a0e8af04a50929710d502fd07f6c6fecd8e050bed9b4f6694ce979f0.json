@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT run_at AS \"run_at!: jiff_sqlx::Timestamp\",\n                  claimed_at AS \"claimed_at: jiff_sqlx::Timestamp\",\n                  attempts\n           FROM scheduled_tasks WHERE key = 'e:old'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "run_at!: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "run_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "claimed_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "claimed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "attempts",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "scheduled_tasks",
+            "name": "attempts"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "3182b9b9a0e8af04a50929710d502fd07f6c6fecd8e050bed9b4f6694ce979f0"
+}
