@@ -100,10 +100,7 @@ impl<'a> Post<'a> {
         if let Some(flags) = self.flags {
             message = message.flags(flags);
         }
-        if let Some(mentions) = &self.allowed_mentions {
-            message = message.allowed_mentions(mentions.clone());
-        }
-        message
+        message.allowed_mentions(self.webhook_mentions())
     }
 
     pub fn to_webhook_edit(&self) -> EditWebhookMessage<'a> {
@@ -120,9 +117,12 @@ impl<'a> Post<'a> {
         if let Some(flags) = self.flags {
             message = message.flags(flags);
         }
-        if let Some(mentions) = &self.allowed_mentions {
-            message = message.allowed_mentions(mentions.clone());
-        }
-        message
+        message.allowed_mentions(self.webhook_mentions())
+    }
+
+    fn webhook_mentions(&self) -> CreateAllowedMentions<'a> {
+        self.allowed_mentions.clone().unwrap_or_else(|| {
+            CreateAllowedMentions::new().all_users(true).all_roles(true)
+        })
     }
 }

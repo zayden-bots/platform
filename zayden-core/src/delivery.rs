@@ -16,12 +16,12 @@ use serenity::all::{
 };
 use serenity::http::Http;
 use sqlx::PgPool;
-use tracing::warn;
+use tracing::{error, warn};
 use zayden_app::applications::Keyring;
 use zayden_app::delivery::DeliveryStore;
 use zayden_app::tasks::{NewTask, ScheduledTasks};
 
-use crate::error::DeliveryError;
+use crate::error::{DeliveryError, WebhookFailure};
 use crate::post::Post;
 use crate::snowflake::as_i64;
 
@@ -35,6 +35,25 @@ pub struct PostPayload {
     pub channel_id: u64,
     pub edit_message_id: Option<u64>,
     pub message: serde_json::Value,
+}
+
+impl PostPayload {
+    pub fn new(
+        channel_id: ChannelId,
+        edit_message_id: Option<MessageId>,
+        post: &Post<'_>,
+    ) -> Result<Self, serde_json::Error> {
+        let message = if edit_message_id.is_some() {
+            serde_json::to_value(post.to_edit_message())?
+        } else {
+            serde_json::to_value(post.to_message())?
+        };
+        Ok(Self {
+            channel_id: channel_id.get(),
+            edit_message_id: edit_message_id.map(MessageId::get),
+            message,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,6 +93,20 @@ impl WebhookPool {
         application_id: ApplicationId,
         post: &Post<'_>,
     ) -> Result<Delivered, DeliveryError> {
+        if let Some(id) = self.try_send(channel_id, application_id, post).await? {
+            return Ok(Delivered::Webhook(id));
+        }
+        queue_post(&self.db, application_id, channel_id, None, post).await?;
+        count("queued");
+        Ok(Delivered::Queued)
+    }
+
+    pub async fn try_send(
+        &self,
+        channel_id: ChannelId,
+        application_id: ApplicationId,
+        post: &Post<'_>,
+    ) -> Result<Option<MessageId>, DeliveryError> {
         let Some(hook) = DeliveryStore::hook(
             &self.db,
             as_i64(channel_id.get()),
@@ -81,12 +114,22 @@ impl WebhookPool {
         )
         .await?
         else {
-            queue_post(&self.db, application_id, channel_id, None, post).await?;
-            count("queued");
-            return Ok(Delivered::Queued);
+            return Ok(None);
         };
 
-        let token = self.keyring.open_webhook(hook.webhook_id, &hook.sealed)?;
+        let token = match self.keyring.open_webhook(hook.webhook_id, &hook.sealed) {
+            Ok(token) => token,
+            Err(e) => {
+                error!(
+                    channel_id = channel_id.get(),
+                    application_id = application_id.get(),
+                    webhook_id = hook.webhook_id,
+                    error = %e,
+                    "cannot open the webhook token; falling back to the bot"
+                );
+                return Ok(None);
+            },
+        };
 
         let mut message = post.to_webhook();
         if let Some(name) = hook.sender_name {
@@ -108,15 +151,14 @@ impl WebhookPool {
         match result {
             Ok(Some(m)) => {
                 count("webhook");
-                Ok(Delivered::Webhook(m.id))
+                Ok(Some(m.id))
             },
             Ok(None) => Err(DeliveryError::NoMessage),
             Err(e) if is_dead_webhook(&e) => {
                 self.break_hook(channel_id, application_id, hook.webhook_id).await?;
-                queue_post(&self.db, application_id, channel_id, None, post).await?;
-                Ok(Delivered::Queued)
+                Ok(None)
             },
-            Err(e) => Err(e.into()),
+            Err(e) => Err(DeliveryError::Discord(WebhookFailure::from(e))),
         }
     }
 
@@ -127,6 +169,24 @@ impl WebhookPool {
         message_id: MessageId,
         post: &Post<'_>,
     ) -> Result<Edited, DeliveryError> {
+        if let Some(edited) =
+            self.try_edit(channel_id, application_id, message_id, post).await?
+        {
+            return Ok(edited);
+        }
+        queue_post(&self.db, application_id, channel_id, Some(message_id), post)
+            .await?;
+        count("queued");
+        Ok(Edited::Queued)
+    }
+
+    pub async fn try_edit(
+        &self,
+        channel_id: ChannelId,
+        application_id: ApplicationId,
+        message_id: MessageId,
+        post: &Post<'_>,
+    ) -> Result<Option<Edited>, DeliveryError> {
         let Some(hook) = DeliveryStore::hook(
             &self.db,
             as_i64(channel_id.get()),
@@ -134,13 +194,22 @@ impl WebhookPool {
         )
         .await?
         else {
-            queue_post(&self.db, application_id, channel_id, Some(message_id), post)
-                .await?;
-            count("queued");
-            return Ok(Edited::Queued);
+            return Ok(None);
         };
 
-        let token = self.keyring.open_webhook(hook.webhook_id, &hook.sealed)?;
+        let token = match self.keyring.open_webhook(hook.webhook_id, &hook.sealed) {
+            Ok(token) => token,
+            Err(e) => {
+                error!(
+                    channel_id = channel_id.get(),
+                    application_id = application_id.get(),
+                    webhook_id = hook.webhook_id,
+                    error = %e,
+                    "cannot open the webhook token; falling back to the bot"
+                );
+                return Ok(None);
+            },
+        };
 
         let result = post
             .to_webhook_edit()
@@ -155,22 +224,17 @@ impl WebhookPool {
         match result {
             Ok(_) => {
                 count("webhook");
-                Ok(Edited::Done)
+                Ok(Some(Edited::Done))
             },
             Err(e) if is_dead_webhook(&e) => {
                 self.break_hook(channel_id, application_id, hook.webhook_id).await?;
-                queue_post(
-                    &self.db,
-                    application_id,
-                    channel_id,
-                    Some(message_id),
-                    post,
-                )
-                .await?;
-                Ok(Edited::Queued)
+                Ok(None)
             },
-            Err(e) if is_missing_message(&e) => Ok(Edited::Missing),
-            Err(e) => Err(e.into()),
+            Err(e) if is_missing_message(&e) => {
+                count("missing");
+                Ok(Some(Edited::Missing))
+            },
+            Err(e) => Err(DeliveryError::Discord(WebhookFailure::from(e))),
         }
     }
 
@@ -228,16 +292,7 @@ pub async fn queue_post(
 ) -> Result<(), DeliveryError> {
     let now = Timestamp::now();
     let seq = QUEUE_SEQ.fetch_add(1, Ordering::Relaxed);
-    let message = if edit_message_id.is_some() {
-        serde_json::to_value(post.to_edit_message())?
-    } else {
-        serde_json::to_value(post.to_message())?
-    };
-    let payload = PostPayload {
-        channel_id: channel_id.get(),
-        edit_message_id: edit_message_id.map(MessageId::get),
-        message,
-    };
+    let payload = PostPayload::new(channel_id, edit_message_id, post)?;
 
     let task = NewTask {
         kind: POST_TASK,
@@ -247,6 +302,31 @@ pub async fn queue_post(
     };
     ScheduledTasks::ensure(pool, as_i64(application_id.get()), &[task]).await?;
     Ok(())
+}
+
+pub async fn deliver_post(
+    http: &Http,
+    payload: &PostPayload,
+) -> serenity::Result<MessageId> {
+    let channel = ChannelId::new(payload.channel_id).widen();
+
+    if let Some(message_id) = payload.edit_message_id {
+        match http
+            .edit_message(
+                channel,
+                MessageId::new(message_id),
+                &payload.message,
+                Vec::new(),
+            )
+            .await
+        {
+            Ok(message) => return Ok(message.id),
+            Err(e) if is_missing_message(&e) => {},
+            Err(e) => return Err(e),
+        }
+    }
+
+    Ok(http.send_message(channel, Vec::new(), &payload.message).await?.id)
 }
 
 pub async fn queue_dm(

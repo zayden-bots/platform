@@ -215,6 +215,36 @@ async fn next_due_is_the_earliest_unclaimed(pool: PgPool) {
     assert!(next.as_microsecond().abs_diff(soon.as_microsecond()) < 1_000);
 }
 
+#[sqlx::test(migrator = "schema::MIGRATOR")]
+async fn purge_unclaimed_spares_claimed_fresh_and_other_kinds(pool: PgPool) {
+    ScheduledTasks::replace(&pool, APP, "claimed", &[new_task(
+        "platform.post",
+        "claimed",
+        ago(3),
+    )])
+    .await
+    .unwrap();
+    ScheduledTasks::claim_due(&pool, APP, &["platform.post"], 10).await.unwrap();
+    ScheduledTasks::replace(&pool, APP, "t:", &[
+        new_task("platform.post", "t:old", ago(3)),
+        new_task("platform.post", "t:fresh", Timestamp::now()),
+        new_task("lfg_reminder", "t:lfg", ago(3)),
+    ])
+    .await
+    .unwrap();
+
+    let purged = ScheduledTasks::purge_unclaimed(
+        &pool,
+        &["platform.post", "platform.dm"],
+        SignedDuration::from_hours(1),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(purged, 1);
+    assert_eq!(keys(&pool).await, ["claimed", "t:fresh", "t:lfg"]);
+}
+
 #[test]
 fn is_stale_after_ten_minutes() {
     let run_at = Timestamp::now();

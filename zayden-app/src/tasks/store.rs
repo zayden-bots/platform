@@ -1,4 +1,4 @@
-use jiff::Timestamp;
+use jiff::{SignedDuration, Timestamp};
 use jiff_sqlx::ToSqlx;
 use sqlx::PgPool;
 
@@ -89,6 +89,27 @@ impl ScheduledTasks {
              WHERE application_id = $1 AND starts_with(key, $2)",
             application_id,
             key_prefix
+        )
+        .execute(pool)
+        .await?;
+
+        Ok(result.rows_affected())
+    }
+
+    pub async fn purge_unclaimed(
+        pool: &PgPool,
+        kinds: &[&str],
+        older_than: SignedDuration,
+    ) -> sqlx::Result<u64> {
+        let kinds: Vec<String> =
+            kinds.iter().map(|kind| (*kind).to_owned()).collect();
+
+        let result = sqlx::query!(
+            "DELETE FROM scheduled_tasks
+             WHERE kind = ANY($1) AND claimed_at IS NULL
+               AND run_at < now() - make_interval(secs => $2)",
+            &kinds,
+            older_than.as_secs_f64()
         )
         .execute(pool)
         .await?;

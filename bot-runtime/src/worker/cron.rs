@@ -1,10 +1,12 @@
+use std::collections::HashMap;
 use std::time::Duration;
 
 use futures::future;
 use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
-use tokio::time::sleep;
-use tracing::{Instrument, debug, error, info_span};
+use tokio::task::JoinHandle;
+use tokio::time::{sleep, timeout};
+use tracing::{Instrument, debug, error, info_span, warn};
 use zayden_core::{
     CronCtx,
     PendingJob,
@@ -15,7 +17,16 @@ use zayden_core::{
 
 use crate::Result;
 
-pub(super) async fn run(mut jobs: Vec<WorkerJob>, cx: CronCtx) -> Result<()> {
+const DRAIN: Duration = Duration::from_secs(8);
+
+pub(super) async fn run(
+    mut jobs: Vec<WorkerJob>,
+    cx: CronCtx,
+    shutdown: impl Future<Output = ()>,
+) -> Result<()> {
+    tokio::pin!(shutdown);
+    let mut running: HashMap<String, JoinHandle<()>> = HashMap::new();
+
     loop {
         let now = Timestamp::now().to_zoned(TimeZone::UTC);
         prune_exhausted(&mut jobs, &now);
@@ -37,27 +48,43 @@ pub(super) async fn run(mut jobs: Vec<WorkerJob>, cx: CronCtx) -> Result<()> {
 
         if sleep_duration > SignedDuration::new(1, 0) {
             let std_duration = sleep_duration.try_into()?;
-            sleep(std_duration).await;
+            tokio::select! {
+                () = sleep(std_duration) => {},
+                () = &mut shutdown => break,
+            }
         }
 
         if !pending_jobs.is_empty() {
-            let handles = pending_jobs.into_iter().map(|job| {
-                let id = job.id.clone();
-                let handle = tokio::spawn(
-                    (job.action)(cx.clone())
-                        .instrument(info_span!("cron_job", job = job.id)),
-                );
-                (id, handle)
-            });
+            running.retain(|_, handle| !handle.is_finished());
 
-            future::join_all(handles.map(|(id, handle)| async move {
-                if let Err(e) = handle.await {
-                    error!(job = id, error = ?e, "worker job panicked");
+            for job in pending_jobs {
+                if running.contains_key(&job.id) {
+                    warn!(job = job.id, "previous run still going; skipped");
+                    continue;
                 }
-            }))
-            .await;
+
+                let id = job.id.clone();
+                let action = (job.action)(cx.clone());
+                let span = info_span!("cron_job", job = job.id);
+                let job_id = id.clone();
+                let handle = tokio::spawn(async move {
+                    if let Err(e) = tokio::spawn(action.instrument(span)).await {
+                        error!(job = job_id, error = ?e, "worker job panicked");
+                    }
+                });
+                running.insert(id, handle);
+            }
         }
 
-        sleep(Duration::from_secs(5)).await;
+        tokio::select! {
+            () = sleep(Duration::from_secs(5)) => {},
+            () = &mut shutdown => break,
+        }
     }
+
+    let remaining = running.len();
+    if timeout(DRAIN, future::join_all(running.into_values())).await.is_err() {
+        warn!(running = remaining, "worker jobs still running at shutdown");
+    }
+    Ok(())
 }

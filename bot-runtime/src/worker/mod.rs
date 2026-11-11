@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use secrecy::ExposeSecret;
 use serenity::all::Http;
+use tokio::signal::unix::{SignalKind, signal};
 use tracing::{error, info, warn};
 use zayden_app::applications::Keyring;
 use zayden_app::config::BotConfig;
@@ -21,7 +22,7 @@ use zayden_core::{
     WorkerModuleCtx,
 };
 
-use crate::cron::EntitlementSweepCron;
+use crate::cron::{EntitlementSweepCron, PlatformTaskGc};
 use crate::error::ModuleErrors;
 use crate::sqlx_lib::new_pool_with_retry;
 use crate::{BotError, Result, logging, status};
@@ -92,7 +93,10 @@ impl WorkerBoot {
             .iter()
             .flat_map(|module| module.jobs())
             .chain(assembly.jobs)
-            .chain([EntitlementSweepCron::worker_job(Arc::clone(&app.entitlements))])
+            .chain([
+                EntitlementSweepCron::worker_job(Arc::clone(&app.entitlements)),
+                PlatformTaskGc::worker_job(app.db.clone()),
+            ])
             .filter_map(|job| match job {
                 Ok(job) => Some(job),
                 Err(e) => {
@@ -102,13 +106,24 @@ impl WorkerBoot {
             })
             .collect::<Vec<WorkerJob>>();
 
-        tokio::select! {
-            result = cron::run(jobs, cx) => result,
-            signal = tokio::signal::ctrl_c() => {
-                signal.map_err(|e| BotError::Other(e.to_string()))
-            },
-        }
+        cron::run(jobs, cx, shutdown_signal()).await
     }
+}
+
+async fn shutdown_signal() {
+    match signal(SignalKind::terminate()) {
+        Ok(mut terminate) => {
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {},
+                _ = terminate.recv() => {},
+            }
+        },
+        Err(e) => {
+            warn!(error = ?e, "cannot install the SIGTERM handler; waiting on ctrl-c only");
+            let _ = tokio::signal::ctrl_c().await;
+        },
+    }
+    info!("worker shutting down");
 }
 
 #[derive(Default)]

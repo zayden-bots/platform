@@ -10,9 +10,12 @@ use tokio::sync::RwLock;
 use tokio::time::sleep;
 use tracing::{Instrument, debug, error, info, info_span};
 use zayden_app::entitlement::EntitlementService;
+use zayden_app::tasks::{PLATFORM_STALE_AFTER, ScheduledTasks};
 use zayden_core::{
     CronJob,
     CronResult,
+    DM_TASK,
+    POST_TASK,
     PendingJob,
     RuntimeState,
     WorkerJob,
@@ -38,6 +41,35 @@ impl EntitlementSweepCron {
                         Ok(_) => {},
                         Err(e) => {
                             error!(error = ?e, "entitlement expiry sweep failed");
+                        },
+                    }
+                }
+            })
+        })
+    }
+}
+
+pub struct PlatformTaskGc;
+
+impl PlatformTaskGc {
+    pub fn worker_job(db: PgPool) -> WorkerJobResult {
+        WorkerJob::new("platform_task_gc", "0 30 * * * * *").map(|job| {
+            job.set_action(move |_cx| {
+                let db = db.clone();
+                async move {
+                    match ScheduledTasks::purge_unclaimed(
+                        &db,
+                        &[POST_TASK, DM_TASK],
+                        PLATFORM_STALE_AFTER,
+                    )
+                    .await
+                    {
+                        Ok(n) if n > 0 => {
+                            info!(purged = n, "platform task gc completed");
+                        },
+                        Ok(_) => {},
+                        Err(e) => {
+                            error!(error = ?e, "platform task gc failed");
                         },
                     }
                 }

@@ -51,6 +51,7 @@ pub use delivery::{
     POST_TASK,
     PostPayload,
     WebhookPool,
+    deliver_post,
     queue_dm,
     queue_post,
 };
@@ -75,7 +76,14 @@ pub mod announce;
 pub mod templates;
 
 pub mod error;
-pub use error::{CoreError, DeliveryError, HandlerError, ModuleError, Respond};
+pub use error::{
+    CoreError,
+    DeliveryError,
+    HandlerError,
+    ModuleError,
+    Respond,
+    WebhookFailure,
+};
 
 pub mod html;
 

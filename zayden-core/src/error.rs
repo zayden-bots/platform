@@ -118,12 +118,47 @@ pub enum DeliveryError {
     Sql(#[from] sqlx::Error),
     #[error(transparent)]
     Seal(#[from] ApplicationError),
-    #[error(transparent)]
-    Discord(#[from] serenity::Error),
+    #[error("discord rejected the webhook call: {0}")]
+    Discord(WebhookFailure),
     #[error(transparent)]
     Encode(#[from] serde_json::Error),
     #[error("the webhook did not return the posted message")]
     NoMessage,
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum WebhookFailure {
+    #[error("{status} {code:?}: {message}")]
+    Response { status: u16, code: JsonErrorCode, message: String },
+    #[error("request failed (timeout: {timeout}, connect: {connect})")]
+    Request { timeout: bool, connect: bool },
+    #[error("webhook call failed ({0})")]
+    Other(&'static str),
+}
+
+impl From<serenity::Error> for WebhookFailure {
+    fn from(e: serenity::Error) -> Self {
+        match e {
+            serenity::Error::Http(HttpError::UnsuccessfulRequest(r)) => {
+                Self::Response {
+                    status: r.status_code.as_u16(),
+                    code: r.error.code,
+                    message: r.error.message.to_string(),
+                }
+            },
+            serenity::Error::Http(HttpError::Request(e)) => {
+                Self::Request { timeout: e.is_timeout(), connect: e.is_connect() }
+            },
+            serenity::Error::Io(_) => Self::Other("io"),
+            serenity::Error::Json(_) => Self::Other("json"),
+            serenity::Error::Model(_) => Self::Other("model"),
+            serenity::Error::Http(_) => Self::Other("http"),
+            serenity::Error::Token(_) => Self::Other("token"),
+            serenity::Error::Url(_) => Self::Other("url"),
+            serenity::Error::Gateway(_) => Self::Other("gateway"),
+            _ => Self::Other("other"),
+        }
+    }
 }
 
 #[derive(Debug)]

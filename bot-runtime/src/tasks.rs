@@ -3,15 +3,7 @@ use std::time::Duration;
 
 use futures::future::join_all;
 use jiff::Timestamp;
-use serenity::all::{
-    ChannelId,
-    Context,
-    HttpError,
-    JsonErrorCode,
-    MessageId,
-    StatusCode,
-    UserId,
-};
+use serenity::all::{Context, UserId};
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::{self};
 use tracing::{error, warn};
@@ -156,7 +148,7 @@ async fn run_platform(ctx: &Context, task: &Task) -> Result<(), HandlerError> {
 
     let sent = if task.kind == POST_TASK {
         let payload = task.payload::<PostPayload>().map_err(HandlerError::new)?;
-        send_post(ctx, &payload).await
+        zayden_core::deliver_post(&ctx.http, &payload).await.map(drop)
     } else {
         let payload = task.payload::<DmPayload>().map_err(HandlerError::new)?;
         send_dm(ctx, &payload).await
@@ -173,42 +165,10 @@ async fn run_platform(ctx: &Context, task: &Task) -> Result<(), HandlerError> {
     Ok(())
 }
 
-async fn send_post(ctx: &Context, payload: &PostPayload) -> serenity::Result<()> {
-    let channel = ChannelId::new(payload.channel_id).widen();
-
-    if let Some(message_id) = payload.edit_message_id {
-        match ctx
-            .http
-            .edit_message(
-                channel,
-                MessageId::new(message_id),
-                &payload.message,
-                Vec::new(),
-            )
-            .await
-        {
-            Ok(_) => return Ok(()),
-            Err(e) if is_missing_message(&e) => {},
-            Err(e) => return Err(e),
-        }
-    }
-
-    ctx.http.send_message(channel, Vec::new(), &payload.message).await?;
-    Ok(())
-}
-
 async fn send_dm(ctx: &Context, payload: &DmPayload) -> serenity::Result<()> {
     let dm = UserId::new(payload.user_id).create_dm_channel(&ctx.http).await?;
     ctx.http.send_message(dm.id.widen(), Vec::new(), &payload.message).await?;
     Ok(())
-}
-
-fn is_missing_message(e: &serenity::Error) -> bool {
-    let serenity::Error::Http(HttpError::UnsuccessfulRequest(response)) = e else {
-        return false;
-    };
-    response.error.code == JsonErrorCode::UnknownMessage
-        || response.status_code == StatusCode::FORBIDDEN
 }
 
 async fn complete(app: &AppState, task: &Task) {
