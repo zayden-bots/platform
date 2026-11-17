@@ -167,6 +167,17 @@ impl EventHandler for Handler {
                 }
                 Self::guild_create(self, ctx, guild, &pool).await
             },
+            FullEvent::GuildCreate {
+                guild: GuildCreateGuild::Unavailable(guild),
+                ..
+            } => {
+                warn!(
+                    guild_id = %guild.id,
+                    unavailable = guild.unavailable,
+                    "guild create without guild data"
+                );
+                return;
+            },
             FullEvent::WebhookUpdate { guild_id, belongs_to_channel_id, .. } => {
                 if let Some(delivery) = self.delivery.get() {
                     delivery.request(DeliveryJob::Webhooks(

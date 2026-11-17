@@ -158,7 +158,7 @@ serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next", d
 songbird = { git = "https://github.com/serenity-rs/songbird", branch = "serenity-next", default-features = false }
 
 # -- Errors
-thiserror = { version = "*", default-features = false }
+thiserror = { version = "2", default-features = false }
 
 # -- Collections and concurrency
 dashmap = { version = "*", default-features = false }
