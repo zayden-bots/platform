@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use futures::future;
-use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout};
@@ -28,18 +27,18 @@ pub(super) async fn run(
     let mut running: HashMap<String, JoinHandle<()>> = HashMap::new();
 
     loop {
-        let now = Timestamp::now().to_zoned(TimeZone::UTC);
-        prune_exhausted(&mut jobs, &now);
-        let pending_jobs: Vec<PendingJob<WorkerJob>> = earliest_pending(&jobs, &now);
+        let now = Timestamp::now();
+        prune_exhausted(&mut jobs, now);
+        let pending_jobs: Vec<PendingJob<WorkerJob>> = earliest_pending(&jobs, now);
 
         let sleep_duration = pending_jobs.first().map_or_else(
             || SignedDuration::new(60, 0),
             |next| {
                 debug!("Next Job: {:?}", next.at);
 
-                let now = Timestamp::now().to_zoned(TimeZone::UTC);
+                let now = Timestamp::now();
                 if next.at > now {
-                    next.at.duration_since(&now)
+                    next.at.duration_since(now)
                 } else {
                     SignedDuration::new(0, 0)
                 }

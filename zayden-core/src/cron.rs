@@ -4,8 +4,8 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use jiff::Zoned;
-use jiff_cron::Schedule;
+use jiff::Timestamp;
+use jiff_cron::{Schedule, jiff as cron_jiff};
 use serenity::all::Context;
 use sqlx::PgPool;
 use zayden_app::state::AppState;
@@ -32,12 +32,33 @@ pub type WorkerActionFn =
 
 pub type WorkerJobResult = Result<WorkerJob, jiff_cron::error::Error>;
 
+fn to_cron(at: Timestamp) -> Option<cron_jiff::Zoned> {
+    cron_jiff::Timestamp::from_nanosecond(at.as_nanosecond())
+        .ok()
+        .map(|t| t.to_zoned(cron_jiff::tz::TimeZone::UTC))
+}
+
+fn from_cron(at: &cron_jiff::Zoned) -> Option<Timestamp> {
+    Timestamp::from_nanosecond(at.timestamp().as_nanosecond()).ok()
+}
+
 pub trait Scheduled {
     type Action: Clone;
 
     fn id(&self) -> &str;
     fn schedule(&self) -> &Schedule;
     fn action(&self) -> Self::Action;
+
+    // `includes` guards jiff-cron's `after` fast path, which can skip the
+    // day-of-week check.
+    fn next_run(&self, now: Timestamp) -> Option<Timestamp> {
+        let schedule = self.schedule();
+        schedule
+            .after(to_cron(now)?)
+            .find(|t| schedule.includes(t.clone()))
+            .as_ref()
+            .and_then(from_cron)
+    }
 }
 
 impl Scheduled for CronJob {
@@ -73,7 +94,7 @@ impl Scheduled for WorkerJob {
 }
 
 pub struct PendingJob<J: Scheduled = CronJob> {
-    pub at: Zoned,
+    pub at: Timestamp,
     pub id: String,
     pub action: J::Action,
 }
@@ -175,24 +196,24 @@ impl CronJob {
     }
 }
 
-fn next_run<J: Scheduled>(job: &J, now: &Zoned) -> Option<Zoned> {
-    let schedule = job.schedule();
-    schedule.after(now.clone()).find(|t| schedule.includes(t.clone()))
-}
-
-pub fn prune_exhausted<J: Scheduled>(jobs: &mut Vec<J>, now: &Zoned) {
-    jobs.retain(|job| job.schedule().after(now.clone()).next().is_some());
+pub fn prune_exhausted<J: Scheduled>(jobs: &mut Vec<J>, now: Timestamp) {
+    let start = to_cron(now);
+    jobs.retain(|job| {
+        start
+            .as_ref()
+            .is_none_or(|s| job.schedule().after(s.clone()).next().is_some())
+    });
 }
 
 #[must_use]
 pub fn earliest_pending<J: Scheduled>(
     jobs: &[J],
-    now: &Zoned,
+    now: Timestamp,
 ) -> Vec<PendingJob<J>> {
     let mut pending: Vec<PendingJob<J>> = Vec::new();
 
     for job in jobs {
-        let Some(run_time) = next_run(job, now) else {
+        let Some(run_time) = job.next_run(now) else {
             continue;
         };
 

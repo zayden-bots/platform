@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures::future;
-use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
 use serenity::all::Context;
 use sqlx::PgPool;
@@ -106,9 +105,9 @@ async fn run_cron_jobs_loop(ctx: Context, pool: PgPool) -> Result<()> {
             |next| {
                 debug!("Next Job: {:?}", next.at);
 
-                let now = Timestamp::now().to_zoned(TimeZone::UTC);
+                let now = Timestamp::now();
                 if next.at > now {
-                    next.at.duration_since(&now)
+                    next.at.duration_since(now)
                 } else {
                     SignedDuration::new(0, 0)
                 }
@@ -136,10 +135,10 @@ async fn run_cron_jobs_loop(ctx: Context, pool: PgPool) -> Result<()> {
 async fn pending_jobs(ctx: &Context) -> Vec<PendingJob> {
     let data = ctx.data::<RwLock<RuntimeState>>();
 
-    let now = Timestamp::now().to_zoned(TimeZone::UTC);
+    let now = Timestamp::now();
 
     let mut state = data.write().await;
 
-    prune_exhausted(state.jobs_mut(), &now);
-    earliest_pending(state.jobs(), &now)
+    prune_exhausted(state.jobs_mut(), now);
+    earliest_pending(state.jobs(), now)
 }

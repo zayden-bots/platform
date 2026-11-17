@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 use zayden_app::guilds::{GuildOwner, GuildPresence, JoinKind};
-use zayden_core::{RuntimeState, as_i64};
+use zayden_core::{RuntimeState, as_i64, serenity_to_jiff};
 
 use super::Handler;
 use crate::{Result, module_sync, serving_guard};
@@ -15,7 +15,7 @@ impl Handler {
         guild: &Guild,
         pool: &PgPool,
     ) -> Result<()> {
-        let joined_at = *guild.joined_at;
+        let joined_at = serenity_to_jiff(&guild.joined_at)?;
 
         let join = GuildPresence::joined(
             pool,

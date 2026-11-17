@@ -21,7 +21,7 @@ use std::str::FromStr;
 use jiff::civil::date;
 use jiff::tz::TimeZone;
 use jiff_cron::Schedule;
-use zayden_core::{CronJob, earliest_pending, prune_exhausted};
+use zayden_core::{CronJob, Scheduled, earliest_pending, prune_exhausted};
 
 /// `"0 0 17 * * Fri *"` — gambling's `lotto` / `higherlower` schedule.
 const FRIDAY_1700: &str = "0 0 17 * * Fri *";
@@ -45,20 +45,37 @@ macro_rules! job {
     };
 }
 
-/// A UTC `Zoned` from civil date/time parts.
+/// A UTC `Timestamp` from civil date/time parts.
 macro_rules! utc {
     ($y:expr, $m:expr, $d:expr, $h:expr, $min:expr, $s:expr) => {
         utc!($y, $m, $d, $h, $min, $s, 0)
     };
     ($y:expr, $m:expr, $d:expr, $h:expr, $min:expr, $s:expr, $nanos:expr) => {
-        date($y, $m, $d).at($h, $min, $s, $nanos).to_zoned(TimeZone::UTC).unwrap()
+        date($y, $m, $d)
+            .at($h, $min, $s, $nanos)
+            .to_zoned_datetime(TimeZone::UTC)
+            .unwrap()
+            .timestamp()
+    };
+}
+
+/// A jiff-cron (jiff 0.2) UTC `Zoned` from civil date/time parts.
+macro_rules! cron_utc {
+    ($y:expr, $m:expr, $d:expr, $h:expr, $min:expr, $s:expr) => {
+        cron_utc!($y, $m, $d, $h, $min, $s, 0)
+    };
+    ($y:expr, $m:expr, $d:expr, $h:expr, $min:expr, $s:expr, $nanos:expr) => {
+        jiff_cron::jiff::civil::date($y, $m, $d)
+            .at($h, $min, $s, $nanos)
+            .to_zoned(jiff_cron::jiff::tz::TimeZone::UTC)
+            .unwrap()
     };
 }
 
 /// The first pending run time, or a test failure.
 macro_rules! first_run {
     ($pending:expr) => {
-        $pending.first().expect("a job is pending").at.clone()
+        $pending.first().expect("a job is pending").at
     };
 }
 
@@ -75,11 +92,11 @@ macro_rules! first_run {
 #[test]
 fn jiff_cron_after_can_propose_a_wrong_weekday() {
     let schedule = Schedule::from_str(FRIDAY_1700).unwrap();
-    let thursday = utc!(2026, 8, 6, 16, 59, 59, 500_000_000);
+    let thursday = cron_utc!(2026, 8, 6, 16, 59, 59, 500_000_000);
 
     let proposed = schedule.after(thursday).next().expect("a candidate");
 
-    assert_eq!(proposed, utc!(2026, 8, 6, 17, 0, 0));
+    assert_eq!(proposed, cron_utc!(2026, 8, 6, 17, 0, 0));
     assert!(
         !schedule.includes(proposed),
         "the schedule itself rejects the time its own iterator proposed"
@@ -93,7 +110,7 @@ fn weekday_restricted_job_resolves_past_a_wrong_weekday_candidate() {
     let jobs = [job!("lotto", FRIDAY_1700)];
     let thursday = utc!(2026, 8, 6, 16, 59, 59, 500_000_000);
 
-    let pending = earliest_pending(&jobs, &thursday);
+    let pending = earliest_pending(&jobs, thursday);
 
     assert_eq!(pending.len(), 1, "the job must still be scheduled");
     assert_eq!(
@@ -110,9 +127,18 @@ fn weekday_restricted_job_takes_a_matching_same_day_candidate() {
     let jobs = [job!("lotto", FRIDAY_1700)];
     let friday = utc!(2026, 8, 7, 16, 59, 59, 500_000_000);
 
-    let pending = earliest_pending(&jobs, &friday);
+    let pending = earliest_pending(&jobs, friday);
 
     assert_eq!(first_run!(pending), utc!(2026, 8, 7, 17, 0, 0));
+}
+
+/// `Scheduled::next_run` is the same guarded resolution `earliest_pending` uses.
+#[test]
+fn next_run_skips_the_wrong_weekday_candidate() {
+    let job = job!("lotto", FRIDAY_1700);
+    let thursday = utc!(2026, 8, 6, 16, 59, 59, 500_000_000);
+
+    assert_eq!(job.next_run(thursday), Some(utc!(2026, 8, 7, 17, 0, 0)));
 }
 
 /// Selection semantics preserved from the original `pending_jobs`: only the
@@ -126,7 +152,7 @@ fn only_the_earliest_job_is_pending() {
     ];
     let thursday = utc!(2026, 8, 6, 12, 0, 0);
 
-    let pending = earliest_pending(&jobs, &thursday);
+    let pending = earliest_pending(&jobs, thursday);
 
     assert_eq!(pending.len(), 1, "stamina alone is next");
     assert_eq!(first_run!(pending), utc!(2026, 8, 6, 12, 10, 0));
@@ -143,7 +169,7 @@ fn jobs_tied_at_the_earliest_run_time_all_fire() {
     // 16:59:00 on a Friday: stamina and both Friday jobs are all due 17:00:00.
     let friday = utc!(2026, 8, 7, 16, 59, 0);
 
-    let pending = earliest_pending(&jobs, &friday);
+    let pending = earliest_pending(&jobs, friday);
 
     assert_eq!(pending.len(), 3, "all three are due at 17:00");
     assert!(pending.iter().all(|p| p.at == utc!(2026, 8, 7, 17, 0, 0)));
@@ -157,7 +183,7 @@ fn run_time_is_always_strictly_after_now() {
     // Exactly on a firing boundary: the next run is the *following* slot.
     let now = utc!(2026, 8, 6, 12, 10, 0);
 
-    let pending = earliest_pending(&jobs, &now);
+    let pending = earliest_pending(&jobs, now);
 
     assert!(first_run!(pending) > now);
     assert_eq!(first_run!(pending), utc!(2026, 8, 6, 12, 20, 0));
@@ -166,7 +192,7 @@ fn run_time_is_always_strictly_after_now() {
 /// An empty registry is not an error, and no job is invented.
 #[test]
 fn no_jobs_means_nothing_pending() {
-    let pending = earliest_pending::<CronJob>(&[], &utc!(2026, 8, 6, 12, 0, 0));
+    let pending = earliest_pending::<CronJob>(&[], utc!(2026, 8, 6, 12, 0, 0));
 
     assert!(pending.is_empty());
 }
@@ -176,7 +202,7 @@ fn no_jobs_means_nothing_pending() {
 fn a_fired_one_shot_is_not_pending() {
     let jobs = [job!("lfg_1", FIRED_ONE_SHOT)];
 
-    let pending = earliest_pending(&jobs, &utc!(2026, 8, 6, 12, 0, 0));
+    let pending = earliest_pending(&jobs, utc!(2026, 8, 6, 12, 0, 0));
 
     assert!(pending.is_empty());
 }
@@ -194,7 +220,7 @@ fn fired_one_shots_are_pruned() {
         job!("lfg_2", FUTURE_ONE_SHOT),
     ];
 
-    prune_exhausted(&mut jobs, &utc!(2026, 8, 6, 12, 0, 0));
+    prune_exhausted(&mut jobs, utc!(2026, 8, 6, 12, 0, 0));
 
     let ids = jobs.iter().map(|job| job.id.as_str()).collect::<Vec<_>>();
     assert_eq!(ids, ["stamina", "lfg_2"], "only fired one-shots are dropped");
@@ -212,7 +238,7 @@ fn a_recurring_job_survives_the_wrong_weekday_window() {
         job!("announce", "0 0 17,18 * * Sun,Thu *"),
     ];
 
-    prune_exhausted(&mut jobs, &utc!(2026, 8, 6, 16, 59, 59, 500_000_000));
+    prune_exhausted(&mut jobs, utc!(2026, 8, 6, 16, 59, 59, 500_000_000));
 
     assert_eq!(jobs.len(), 3, "no weekday-restricted job may be pruned");
 }

@@ -171,7 +171,7 @@ serde_json = { version = "*", default-features = false }
 toml = { version = "*", default-features = false }
 
 # -- Dates and times
-jiff = { version = "*", default-features = false }
+jiff = { version = "1", default-features = false }
 jiff-cron = { version = "*", default-features = false }
 jiff-sqlx = { version = "*", default-features = false }
 

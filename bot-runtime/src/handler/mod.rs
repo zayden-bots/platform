@@ -1,7 +1,13 @@
 use std::sync::{Arc, OnceLock};
 
 use secrecy::ExposeSecret;
-use serenity::all::{Event, EventHandler, FullEvent, RatelimitInfo};
+use serenity::all::{
+    Event,
+    EventHandler,
+    FullEvent,
+    GuildCreateGuild,
+    RatelimitInfo,
+};
 use serenity::async_trait;
 use serenity::model::prelude::Interaction;
 use serenity::prelude::Context;
@@ -152,7 +158,10 @@ impl EventHandler for Handler {
         }
 
         let result = match ev {
-            FullEvent::GuildCreate { guild, .. } => {
+            FullEvent::GuildCreate {
+                guild: GuildCreateGuild::Available(guild),
+                ..
+            } => {
                 if let Some(delivery) = self.delivery.get() {
                     delivery.request(DeliveryJob::Guild(guild.id));
                 }
