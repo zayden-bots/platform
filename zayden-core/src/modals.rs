@@ -22,10 +22,6 @@ pub fn parse_modal_components(
             ModalComponent::Label(label) => {
                 Some(vec![parse_label(&label.component)])
             },
-            c => {
-                warn!("New component {c:?}");
-                None
-            },
         })
         .flatten()
         .collect()
@@ -55,10 +51,6 @@ pub fn parse_text_components(
                 Some(parse_container(&container.components))
             },
             Component::Label(label) => Some(vec![parse_label(&label.component)]),
-            c => {
-                warn!("New component {c:?}");
-                None
-            },
         })
         .flatten()
         .collect()
@@ -77,10 +69,6 @@ fn parse_action_row(
                 );
                 None
             }
-            c => {
-                warn!("New action row component {c:?}");
-                None
-            }
         })
         .collect()
 }
@@ -92,10 +80,6 @@ fn parse_section(
         .iter()
         .filter_map(|c| match c {
             SectionComponent::TextDisplay(_) => None,
-            c => {
-                warn!("New component: {c:?}");
-                None
-            },
         })
         .collect()
 }
@@ -126,11 +110,6 @@ fn parse_label(component: &LabelComponent) -> (Cow<'_, str>, Vec<Cow<'_, str>>) 
         | LabelComponent::Checkbox(_) => {
             warn!("parse_label: component uses a non-text format; skipping",);
             (Cow::Owned(String::new()), Vec::new())
-        },
-
-        c => {
-            warn!("New label component {c:?}");
-            (Cow::Owned(String::new()), vec![Cow::Owned(String::new())])
         },
     }
 }

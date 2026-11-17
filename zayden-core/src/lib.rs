@@ -140,7 +140,6 @@ pub use module::{
 
 pub mod registry;
 pub use registry::{RegistryBuilder, RegistryParts};
-use tracing::warn;
 
 pub trait FromOption<'a>: Sized {
     fn from_option(value: ResolvedValue<'a>) -> Option<Self>;
@@ -301,10 +300,6 @@ pub fn get_option_str(options: &[ResolvedOption<'_>]) -> String {
             | ResolvedValue::Channel(_)
             | ResolvedValue::Role(_)
             | ResolvedValue::Unresolved(_) => {
-                let _ = write!(s, "{:?}", option.value);
-            },
-            _ => {
-                warn!("unexpected resolved option type: {:?}", option.value);
                 let _ = write!(s, "{:?}", option.value);
             },
         }

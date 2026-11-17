@@ -156,7 +156,6 @@ impl From<serenity::Error> for WebhookFailure {
             serenity::Error::Token(_) => Self::Other("token"),
             serenity::Error::Url(_) => Self::Other("url"),
             serenity::Error::Gateway(_) => Self::Other("gateway"),
-            _ => Self::Other("other"),
         }
     }
 }

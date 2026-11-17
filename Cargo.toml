@@ -152,8 +152,7 @@ schema = { git = "https://github.com/zayden-bots/schema" }
 # -- Discord
 serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next", default-features = false, features = [
     "rustls_backend",
-    "transport_compression_zlib",
-    "transport_compression_zstd",
+    "unstable_exhaustive_types",
 ] }
 songbird = { git = "https://github.com/serenity-rs/songbird", branch = "serenity-next", default-features = false }
 

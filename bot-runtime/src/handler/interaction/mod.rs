@@ -11,7 +11,7 @@ use serenity::all::{
     Message,
     ModalInteraction,
 };
-use tracing::{error, warn};
+use tracing::error;
 use zayden_app::state::AppState;
 use zayden_core::Identity;
 use zayden_core::error::HandlerError;
@@ -216,10 +216,6 @@ impl Handler {
                 .await
             },
             Interaction::Ping(_) => Ok(()),
-            other => {
-                warn!(kind = ?other.kind(), "interaction kind not handled");
-                Ok(())
-            },
         }
     }
 }
