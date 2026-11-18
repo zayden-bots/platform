@@ -4,10 +4,11 @@
 use std::time::Duration;
 
 use sqlx::PgPool;
+use sqlx::postgres::PgListener;
 use tokio::sync::broadcast;
 use tokio::time::{sleep, timeout};
 use zayden_app::events::listener::EventListener;
-use zayden_app::events::{AppEvent, Channel};
+use zayden_app::events::{AppEvent, Channel, DeadlockAppEvent};
 
 #[test]
 fn channel_names_round_trip() {
@@ -124,6 +125,58 @@ fn a_task_scheduled_carries_the_application() {
         Some(AppEvent::TaskScheduled(7))
     ));
     assert!(Channel::TaskScheduled.decode("x").is_none());
+}
+
+#[test]
+fn a_deadlock_app_payload_from_the_database_decodes() {
+    assert!(matches!(
+        Channel::DeadlockApp
+            .decode(r#"{"type" : "link_changed", "discord_id" : 41}"#),
+        Some(AppEvent::DeadlockApp(DeadlockAppEvent::LinkChanged {
+            discord_id: 41
+        }))
+    ));
+    assert!(matches!(
+        Channel::DeadlockApp.decode(r#"{"type" : "token_revoked", "token_id" : 7}"#),
+        Some(AppEvent::DeadlockApp(DeadlockAppEvent::TokenRevoked { token_id: 7 }))
+    ));
+}
+
+#[test]
+fn deadlock_app_events_round_trip() {
+    let events = [
+        DeadlockAppEvent::Patch { client_version: 6_200 },
+        DeadlockAppEvent::MatchReady { discord_id: 41, match_id: u64::MAX },
+        DeadlockAppEvent::TokenRevoked { token_id: 7 },
+        DeadlockAppEvent::LinkChanged { discord_id: 41 },
+    ];
+
+    for event in events {
+        let json = serde_json::to_string(&event).unwrap();
+        assert_eq!(DeadlockAppEvent::decode(&json), Some(event));
+    }
+}
+
+#[test]
+fn an_unknown_deadlock_app_type_is_dropped() {
+    assert!(Channel::DeadlockApp.decode(r#"{"type":"later"}"#).is_none());
+    assert!(Channel::DeadlockApp.decode("7").is_none());
+}
+
+#[sqlx::test(migrator = "schema::MIGRATOR")]
+async fn a_deadlock_app_notify_reaches_a_listener(pool: PgPool) {
+    let mut listener = PgListener::connect_with(&pool).await.unwrap();
+    listener.listen("deadlock_app").await.unwrap();
+
+    let event = DeadlockAppEvent::MatchReady { discord_id: 41, match_id: 9 };
+    event.notify(&pool).await.unwrap();
+
+    let notification = listener.recv().await.unwrap();
+    assert_eq!(
+        Channel::from_name(notification.channel()),
+        Some(Channel::DeadlockApp)
+    );
+    assert_eq!(DeadlockAppEvent::decode(notification.payload()), Some(event));
 }
 
 #[sqlx::test(migrator = "schema::MIGRATOR")]

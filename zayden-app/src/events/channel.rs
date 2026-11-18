@@ -1,6 +1,6 @@
 use sqlx::PgExecutor;
 
-use super::AppEvent;
+use super::{AppEvent, DeadlockAppEvent};
 use crate::entitlement::EntitlementScope;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,10 +17,11 @@ pub enum Channel {
     TaskScheduled,
     DeliveryChanged,
     WebhookBroken,
+    DeadlockApp,
 }
 
 impl Channel {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::ConfigChanged,
         Self::ModulesChanged,
         Self::EntitlementChanged,
@@ -33,6 +34,7 @@ impl Channel {
         Self::TaskScheduled,
         Self::DeliveryChanged,
         Self::WebhookBroken,
+        Self::DeadlockApp,
     ];
 
     #[must_use]
@@ -50,6 +52,7 @@ impl Channel {
             Self::TaskScheduled => "task_scheduled",
             Self::DeliveryChanged => "delivery_changed",
             Self::WebhookBroken => "webhook_broken",
+            Self::DeadlockApp => "deadlock_app",
         }
     }
 
@@ -90,6 +93,9 @@ impl Channel {
                 let channel_id = parts.next()?.parse().ok()?;
                 let application_id = parts.next()?.parse().ok()?;
                 AppEvent::WebhookBroken { guild_id, channel_id, application_id }
+            },
+            Self::DeadlockApp => {
+                AppEvent::DeadlockApp(DeadlockAppEvent::decode(payload)?)
             },
         };
 

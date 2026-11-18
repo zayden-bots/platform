@@ -1,7 +1,9 @@
 mod channel;
+mod deadlock_app;
 pub mod listener;
 
 pub use channel::Channel;
+pub use deadlock_app::DeadlockAppEvent;
 use serde::{Deserialize, Serialize};
 
 use crate::entitlement::EntitlementScope;
@@ -20,5 +22,6 @@ pub enum AppEvent {
     TaskScheduled(u64),
     DeliveryChanged(u64),
     WebhookBroken { guild_id: u64, channel_id: u64, application_id: u64 },
+    DeadlockApp(DeadlockAppEvent),
     Resync,
 }
